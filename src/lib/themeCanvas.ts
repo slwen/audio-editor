@@ -1,0 +1,13 @@
+/** Read a CSS custom property as a color string (hex, rgb(), etc.). */
+export function readCssColor(varName: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
+  return v || fallback
+}
+
+export function parseHexRgb(hex: string): { r: number; g: number; b: number } {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return { r: 65, g: 166, b: 246 }
+  const n = parseInt(m[1], 16)
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+}
