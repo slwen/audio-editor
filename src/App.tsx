@@ -1,19 +1,26 @@
 import { useEffect } from 'react'
 import { audioEngine } from '@/audio/AudioEngine'
 import { Inspector } from '@/components/Inspector'
+import { LoopInspector } from '@/components/LoopInspector'
+import { LoopTimeline } from '@/components/LoopTimeline'
 import { Timeline } from '@/components/Timeline'
 import { TransportBar } from '@/components/TransportBar'
 import { ingestAudioFiles } from '@/lib/ingestFiles'
 import { skipToStart, togglePlayback } from '@/playback/playbackActions'
+import { useProjectPersistence } from '@/persistence/useProjectPersistence'
 import { useProjectStore } from '@/store/useProjectStore'
 
 export default function App() {
+  const editorMode = useProjectStore((s) => s.editorMode)
+  useProjectPersistence()
+
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
       e.preventDefault()
     }
     const onDrop = (e: DragEvent) => {
       e.preventDefault()
+      if (useProjectStore.getState().editorMode === 'loop') return
       const files = [...(e.dataTransfer?.files ?? [])]
       if (files.length === 0) return
       const hasClips = useProjectStore.getState().clips.length > 0
@@ -50,6 +57,7 @@ export default function App() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return
+      const looped = useProjectStore.getState().editorMode === 'loop'
       if (e.code === 'Space') {
         e.preventDefault()
         void togglePlayback()
@@ -60,6 +68,7 @@ export default function App() {
         skipToStart()
         return
       }
+      if (looped) return
       if (e.metaKey || e.ctrlKey) {
         if (e.code === 'KeyZ') {
           e.preventDefault()
@@ -93,8 +102,17 @@ export default function App() {
     <div className="app">
       <TransportBar />
       <main className="app__main">
-        <Timeline />
-        <Inspector />
+        {editorMode === 'loop' ? (
+          <>
+            <LoopTimeline />
+            <LoopInspector />
+          </>
+        ) : (
+          <>
+            <Timeline />
+            <Inspector />
+          </>
+        )}
       </main>
     </div>
   )

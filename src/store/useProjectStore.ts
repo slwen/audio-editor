@@ -16,7 +16,7 @@ import {
   stableAccentForClipId,
 } from '@/lib/trackAccent'
 import { clearOriginalBytes, rememberOriginalBytes } from '@/persistence/fileBytes'
-import type { BufferMeta, Clip, ClipId, ProjectSnapshot } from '@/types'
+import type { BufferId, BufferMeta, Clip, ClipId, EditorMode, ProjectSnapshot } from '@/types'
 
 const MAX_UNDO = 50
 
@@ -55,6 +55,7 @@ type ProjectState = {
   masterGain: number
   pixelsPerSecond: number
   scrollX: number
+  editorMode: EditorMode
   undoStack: ProjectSnapshot[]
   redoStack: ProjectSnapshot[]
 }
@@ -79,6 +80,15 @@ type ProjectActions = {
     row: number,
     persistOriginal?: ArrayBuffer
   ) => ClipId
+  addClipOnExistingBuffer: (opts: {
+    bufferId: BufferId
+    label: string
+    startTime: number
+    row: number
+    trimStart: number
+    trimEnd: number
+  }) => ClipId | null
+  setEditorMode: (mode: EditorMode) => void
   updateClip: (id: ClipId, patch: Partial<Clip>) => void
   removeClip: (id: ClipId) => void
   deleteSelected: () => void
@@ -107,6 +117,7 @@ const initialState: ProjectState = {
   masterGain: 1,
   pixelsPerSecond: 80,
   scrollX: 0,
+  editorMode: 'edit',
   undoStack: [],
   redoStack: [],
 }
@@ -204,6 +215,34 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
     }))
     return id
   },
+
+  addClipOnExistingBuffer: ({ bufferId, label, startTime, row, trimStart, trimEnd }) => {
+    const s0 = get()
+    const meta = s0.bufferMeta.find((b) => b.id === bufferId)
+    if (!meta) return null
+    const id = crypto.randomUUID()
+    const clip: Clip = {
+      id,
+      bufferId,
+      startTime,
+      row,
+      layerIndex: 0,
+      trimStart,
+      trimEnd,
+      gain: 1,
+      fadeInSec: 0,
+      fadeOutSec: 0,
+      speed: 1,
+      accentColor: pickRandomTrackAccent(),
+      label,
+    }
+    set((s) => ({
+      clips: [...s.clips, clip],
+    }))
+    return id
+  },
+
+  setEditorMode: (mode) => set({ editorMode: mode }),
 
   updateClip: (id, patch) =>
     set((s) => ({
@@ -398,7 +437,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
     clearBufferCache()
     clearPeaks()
     clearOriginalBytes()
-    set({ ...initialState })
+    set({ ...initialState, editorMode: 'edit' })
   },
 
   loadSnapshot: (snap) =>
@@ -413,6 +452,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
         })),
         selection: [],
         isPlaying: false,
+        editorMode: 'edit' as const,
         undoStack: [],
         redoStack: [],
       }

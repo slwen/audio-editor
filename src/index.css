@@ -428,3 +428,84 @@ body {
   color: var(--ui-bg-deep);
   font-weight: 600;
 }
+
+.loop-mode-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+}
+
+.loop-mode-badge--on {
+  color: var(--ui-bg-deep);
+  background: var(--track-cyan);
+  border-color: var(--track-cyan);
+}
+
+.loop-candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.loop-candidate {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
+  text-align: left;
+  min-height: unset;
+  height: auto;
+  padding: 0.4rem 0.5rem;
+}
+
+.loop-candidate__title {
+  font-size: 0.8rem;
+  color: var(--ui-text);
+}
+
+.loop-candidate__meta {
+  font-size: 0.72rem;
+  color: var(--ui-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.loop-candidate__bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ui-surface-2);
+  overflow: hidden;
+}
+
+.loop-candidate__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.loop-candidate--selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--ui-surface-2) 80%, var(--accent) 20%);
+}
+
+.loop-candidate--preview {
+  box-shadow: 0 0 0 1px var(--selection-ring);
+}
+
+.field--check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.field--check input[type='checkbox'] {
+  width: auto;
+}

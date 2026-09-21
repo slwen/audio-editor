@@ -4,6 +4,7 @@ import { audioEngine } from '@/audio/AudioEngine'
 import { exportSelectedWav } from '@/audio/exportWav'
 import { clipTimelineDuration, clipTimelineEnd } from '@/lib/clipMath'
 import { downloadBlob } from '@/lib/downloadBlob'
+import { enterLoopModeFromSelection } from '@/loop/loopModeActions'
 import { useProjectStore } from '@/store/useProjectStore'
 
 const SPEED_PRESETS = [0.5, 1, 1.25, 1.5, 2, 3] as const
@@ -137,6 +138,15 @@ export function Inspector() {
             >
               Export {selected.length} selected
             </button>
+            {selected.length === 1 && (
+              <button
+                type="button"
+                className="btn btn--small"
+                onClick={() => enterLoopModeFromSelection()}
+              >
+                Find loops
+              </button>
+            )}
           </div>
 
           {selected.length > 1 && (

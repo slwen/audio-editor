@@ -29,6 +29,8 @@ export class AudioEngine {
   private onTick?: (timelineT: number) => void
   private sessionPlaying = false
   private projectEndTime = 0
+  private loopStart = 0
+  private loopLen = 0
 
   getContext(): AudioContext | null {
     return this.ctx
@@ -36,7 +38,13 @@ export class AudioEngine {
 
   getCurrentTimelineTime(): number {
     if (!this.ctx) return this.playheadAtStart
-    return this.playheadAtStart + (this.ctx.currentTime - this.startCtxTime)
+    const raw = this.playheadAtStart + (this.ctx.currentTime - this.startCtxTime)
+    if (this.loopLen > 1e-6) {
+      const elapsed = raw - this.loopStart
+      const wrapped = ((elapsed % this.loopLen) + this.loopLen) % this.loopLen
+      return this.loopStart + wrapped
+    }
+    return raw
   }
 
   async init(): Promise<AudioContext> {
@@ -55,6 +63,8 @@ export class AudioEngine {
 
   stop(): void {
     this.sessionPlaying = false
+    this.loopLen = 0
+    this.loopStart = 0
     if (this.raf) cancelAnimationFrame(this.raf)
     this.raf = 0
     for (const chain of this.active) {
@@ -90,6 +100,8 @@ export class AudioEngine {
     this.playheadAtStart = playhead
     this.startCtxTime = ctx.currentTime
     this.onTick = onTick
+    this.loopLen = 0
+    this.loopStart = 0
     this.projectEndTime = clips.length > 0 ? getProjectEndTime(clips) : playhead
     this.sessionPlaying = true
 
@@ -174,6 +186,54 @@ export class AudioEngine {
         onEnded?.()
         return
       }
+      this.raf = requestAnimationFrame(tick)
+    }
+    this.raf = requestAnimationFrame(tick)
+  }
+
+  playLoopingRegion(
+    bufferId: string,
+    startSec: number,
+    endSec: number,
+    gainLinear: number,
+    onTick?: (sourceT: number) => void,
+    playFromSec?: number
+  ): void {
+    this.stop()
+    const ctx = this.ctx
+    const master = this.master
+    if (!ctx || !master) return
+    const buf = getCachedBuffer(bufferId)
+    if (!buf) return
+
+    const start = Math.max(0, Math.min(buf.duration, startSec))
+    const end = Math.max(start + 1e-3, Math.min(buf.duration, endSec))
+    const dur = end - start
+    const from = Math.max(start, Math.min(end - 1e-3, playFromSec ?? start))
+
+    this.playheadAtStart = from
+    this.startCtxTime = ctx.currentTime
+    this.onTick = onTick
+    this.loopStart = start
+    this.loopLen = dur
+    this.sessionPlaying = true
+    this.projectEndTime = Number.POSITIVE_INFINITY
+
+    const source = ctx.createBufferSource()
+    source.buffer = buf
+    source.loop = true
+    source.loopStart = start
+    source.loopEnd = end
+    const gain = ctx.createGain()
+    gain.gain.value = clampLinearGain(gainLinear)
+    source.connect(gain)
+    gain.connect(master)
+    source.start(ctx.currentTime, from)
+    this.active.push({ clipId: 'loop-preview', source, st: null, gain })
+
+    const tick = () => {
+      if (!this.sessionPlaying) return
+      this.onTick?.(this.getCurrentTimelineTime())
       this.raf = requestAnimationFrame(tick)
     }
     this.raf = requestAnimationFrame(tick)

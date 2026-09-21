@@ -1,4 +1,7 @@
 import { audioEngine } from '@/audio/AudioEngine'
+import { joinPreviewOffset } from '@/loop/detectLoops'
+import { startLoopPreview, stopLoopPreview } from '@/loop/loopModeActions'
+import { useLoopStore } from '@/store/useLoopStore'
 import { useProjectStore } from '@/store/useProjectStore'
 
 const playCallbacks = () =>
@@ -19,6 +22,12 @@ export async function seekToTimelineTime(t: number): Promise<void> {
     audioEngine.stop()
     return
   }
+  if (st.editorMode === 'loop') {
+    const loop = useLoopStore.getState()
+    const id = loop.previewId ?? loop.selectedIds[0]
+    await startLoopPreview(id ?? undefined)
+    return
+  }
   const { onEnded, onTick } = playCallbacks()
   audioEngine.play(tClamped, st.clips, st.masterGain, onEnded, onTick)
 }
@@ -26,6 +35,14 @@ export async function seekToTimelineTime(t: number): Promise<void> {
 export async function togglePlayback(): Promise<void> {
   const st = useProjectStore.getState()
   await audioEngine.init()
+  if (st.editorMode === 'loop') {
+    if (st.isPlaying) {
+      stopLoopPreview()
+      return
+    }
+    await startLoopPreview()
+    return
+  }
   if (st.isPlaying) {
     const t = audioEngine.getCurrentTimelineTime()
     audioEngine.stop()
@@ -40,8 +57,25 @@ export async function togglePlayback(): Promise<void> {
 
 export function skipToStart(): void {
   void audioEngine.init().then(() => {
+    const st = useProjectStore.getState()
+    if (st.editorMode === 'loop') {
+      const loop = useLoopStore.getState()
+      const cand = loop.candidates.find((c) => c.id === (loop.previewId ?? loop.selectedIds[0]))
+      const bpm = cand?.bpm ?? loop.bpm ?? 120
+      const t = cand
+        ? joinPreviewOffset(cand.startSec, cand.endSec, bpm)
+        : loop.trimStart
+      if (st.isPlaying) {
+        void startLoopPreview(cand?.id)
+        return
+      }
+      audioEngine.stop()
+      st.setPlayhead(t)
+      st.setIsPlaying(false)
+      return
+    }
     audioEngine.stop()
-    useProjectStore.getState().setPlayhead(0)
-    useProjectStore.getState().setIsPlaying(false)
+    st.setPlayhead(0)
+    st.setIsPlaying(false)
   })
 }

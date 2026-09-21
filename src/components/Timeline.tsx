@@ -1,7 +1,6 @@
 import { CopyPlus, Redo2, Trash2, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { audioEngine } from '@/audio/AudioEngine'
-import { cacheBuffer, getCachedBuffer } from '@/audio/bufferCache'
+import { getCachedBuffer } from '@/audio/bufferCache'
 import { exportMixedWav } from '@/audio/exportWav'
 import { downloadBlob } from '@/lib/downloadBlob'
 import { ingestAudioFiles } from '@/lib/ingestFiles'
@@ -13,14 +12,12 @@ import {
   fadeMultiplier,
   sourceTimeAtTimelineTime,
 } from '@/lib/clipMath'
-import { getPeaks, setPeaksForBuffer } from '@/lib/peaksCache'
+import { getPeaks } from '@/lib/peaksCache'
 import { edgeSnapStart } from '@/lib/snap'
 import { readCssColor, parseHexRgb } from '@/lib/themeCanvas'
 import { maxTimelineScrollPx, scrollForPlayheadCentered, TIMELINE_PAD_L } from '@/lib/timelineScroll'
 import { clipAccentHex } from '@/lib/trackAccent'
-import { clearStoredProject, loadProject, saveProject } from '@/persistence/projectDb'
-import type { PersistedProject } from '@/persistence/projectDb'
-import { loadOriginalBytesMap, takeOriginalBytesMap } from '@/persistence/fileBytes'
+import { clearStoredProject } from '@/persistence/projectDb'
 import { seekToTimelineTime } from '@/playback/playbackActions'
 import { useProjectStore } from '@/store/useProjectStore'
 import type { Clip, ClipId } from '@/types'
@@ -113,7 +110,6 @@ export function Timeline() {
   const setSelection = useProjectStore((s) => s.setSelection)
   const updateClip = useProjectStore((s) => s.updateClip)
   const pushUndo = useProjectStore((s) => s.pushUndo)
-  const loadSnapshot = useProjectStore((s) => s.loadSnapshot)
   const resetProject = useProjectStore((s) => s.resetProject)
   const splitAt = useProjectStore((s) => s.splitAt)
   const undo = useProjectStore((s) => s.undo)
@@ -269,7 +265,7 @@ export function Timeline() {
 
       ctx.fillStyle = css('--ui-text', '#f4f4f4')
       ctx.font = '12px system-ui, sans-serif'
-      ctx.fillText(nameByBuffer.get(c.bufferId) ?? 'clip', x0 + 8, y0 + 18)
+      ctx.fillText(c.label ?? nameByBuffer.get(c.bufferId) ?? 'clip', x0 + 8, y0 + 18)
     }
 
     for (const c of clipsDrawOrder) drawClip(c)
@@ -367,62 +363,6 @@ export function Timeline() {
     wrap.addEventListener('wheel', onWheelNative, { passive: false })
     return () => wrap.removeEventListener('wheel', onWheelNative)
   }, [])
-
-  useEffect(() => {
-    let saveTimer: number
-    let unsub: (() => void) | undefined
-    let cancelled = false
-
-    void (async () => {
-      try {
-        const raw = await loadProject()
-        if (!cancelled && raw && raw.version === 1) {
-          const ctx = await audioEngine.init()
-          loadOriginalBytesMap(raw.fileBytes ?? {})
-          for (const m of raw.bufferMeta) {
-            const bytes = raw.fileBytes?.[m.id]
-            if (!bytes) continue
-            try {
-              const buf = await ctx.decodeAudioData(bytes.slice(0))
-              cacheBuffer(m.id, buf)
-              setPeaksForBuffer(m.id, buf)
-            } catch {
-              /* skip corrupt */
-            }
-          }
-          loadSnapshot({
-            clips: raw.clips,
-            bufferMeta: raw.bufferMeta,
-            playhead: raw.playhead,
-            masterGain: raw.masterGain,
-          })
-        }
-      } catch {
-        /* ignore load errors */
-      }
-      if (cancelled) return
-      unsub = useProjectStore.subscribe((s) => {
-        window.clearTimeout(saveTimer)
-        saveTimer = window.setTimeout(() => {
-          const data: PersistedProject = {
-            version: 1,
-            clips: s.clips,
-            bufferMeta: s.bufferMeta,
-            playhead: s.playhead,
-            masterGain: s.masterGain,
-            fileBytes: takeOriginalBytesMap(),
-          }
-          void saveProject(data)
-        }, 500)
-      })
-    })()
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(saveTimer)
-      unsub?.()
-    }
-  }, [loadSnapshot])
 
   const onPointerDown = (e: React.PointerEvent) => {
     const canvas = canvasRef.current

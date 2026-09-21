@@ -1,5 +1,6 @@
 export type ClipId = string
 export type BufferId = string
+export type EditorMode = 'edit' | 'loop'
 
 export interface Clip {
   id: ClipId
@@ -16,6 +17,8 @@ export interface Clip {
   speed: number
   /** Per-clip waveform / track accent (bright palette hex). */
   accentColor?: string
+  /** Optional display name; falls back to buffer meta name. */
+  label?: string
 }
 
 export interface BufferMeta {
