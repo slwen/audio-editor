@@ -1,4 +1,6 @@
 import { audioEngine } from '@/audio/AudioEngine'
+import { startAdaptive, stopAdaptive } from '@/adaptive/actions'
+import { useAdaptiveStore } from '@/adaptive/store'
 import { joinPreviewOffset } from '@/loop/detectLoops'
 import { startLoopPreview, stopLoopPreview } from '@/loop/loopModeActions'
 import { useLoopStore } from '@/store/useLoopStore'
@@ -33,6 +35,11 @@ export async function seekToTimelineTime(t: number): Promise<void> {
 }
 
 export async function togglePlayback(): Promise<void> {
+  if (useAdaptiveStore.getState().open && useProjectStore.getState().editorMode === 'loop') {
+    if (useAdaptiveStore.getState().playback.current || useAdaptiveStore.getState().starting) stopAdaptive()
+    else await startAdaptive()
+    return
+  }
   const st = useProjectStore.getState()
   await audioEngine.init()
   if (st.editorMode === 'loop') {
@@ -56,6 +63,11 @@ export async function togglePlayback(): Promise<void> {
 }
 
 export function skipToStart(): void {
+  if (useAdaptiveStore.getState().open && useProjectStore.getState().editorMode === 'loop') {
+    const current = useAdaptiveStore.getState().playback.current
+    if (current) void startAdaptive(current)
+    return
+  }
   void audioEngine.init().then(() => {
     const st = useProjectStore.getState()
     if (st.editorMode === 'loop') {

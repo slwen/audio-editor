@@ -1,4 +1,7 @@
 import { useEffect } from 'react'
+import { AdaptiveMusicPreview } from '@/components/AdaptiveMusicPreview'
+import { useAdaptiveStore } from '@/adaptive/store'
+import { syncTransitionFeedback } from '@/adaptive/actions'
 import { audioEngine } from '@/audio/AudioEngine'
 import { Inspector } from '@/components/Inspector'
 import { LoopInspector } from '@/components/LoopInspector'
@@ -12,7 +15,9 @@ import { useProjectStore } from '@/store/useProjectStore'
 
 export default function App() {
   const editorMode = useProjectStore((s) => s.editorMode)
+  const adaptiveOpen = useAdaptiveStore(s => s.open)
   useProjectPersistence()
+  useEffect(() => { void syncTransitionFeedback() }, [])
 
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
@@ -57,6 +62,7 @@ export default function App() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return
+      if (e.code === 'Space' && e.target instanceof HTMLElement && e.target.closest('button')) return
       const looped = useProjectStore.getState().editorMode === 'loop'
       if (e.code === 'Space') {
         e.preventDefault()
@@ -102,7 +108,7 @@ export default function App() {
     <div className="app">
       <TransportBar />
       <main className="app__main">
-        {editorMode === 'loop' ? (
+        {editorMode === 'loop' && adaptiveOpen ? <AdaptiveMusicPreview /> : editorMode === 'loop' ? (
           <>
             <LoopTimeline />
             <LoopInspector />

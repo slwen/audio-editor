@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+loop-ratings.jsonl
+transition-ratings.jsonl
 
 # Editor directories and files
 .vscode/*

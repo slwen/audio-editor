@@ -1,4 +1,6 @@
 import { Pause, Play, SkipBack } from 'lucide-react'
+import { closeAdaptive, openAdaptive } from '@/adaptive/actions'
+import { useAdaptiveStore } from '@/adaptive/store'
 import { getProjectEndTime } from '@/lib/clipMath'
 import { enterLoopModeFromSelection, exitLoopMode } from '@/loop/loopModeActions'
 import { skipToStart, togglePlayback } from '@/playback/playbackActions'
@@ -6,6 +8,8 @@ import { useLoopStore } from '@/store/useLoopStore'
 import { useProjectStore } from '@/store/useProjectStore'
 
 export function TransportBar() {
+  const adaptiveOpen = useAdaptiveStore(s => s.open)
+  const adaptiveCurrent = useAdaptiveStore(s => s.playback.current)
   const playhead = useProjectStore((s) => s.playhead)
   const isPlaying = useProjectStore((s) => s.isPlaying)
   const clips = useProjectStore((s) => s.clips)
@@ -31,7 +35,7 @@ export function TransportBar() {
     <header className="transport">
       <div className="transport__brand">Audio edit</div>
       <span className={`loop-mode-badge${looping ? ' loop-mode-badge--on' : ''}`}>
-        {looping ? 'Loop' : 'Edit'}
+        {adaptiveOpen && looping ? 'Adaptive' : looping ? 'Loop' : 'Edit'}
       </span>
       <div className="transport__controls">
         <button
@@ -52,7 +56,7 @@ export function TransportBar() {
         </button>
       </div>
       {looping ? (
-        <button type="button" className="btn btn--small" onClick={() => exitLoopMode()}>
+        <button type="button" className="btn btn--small" onClick={() => { closeAdaptive(); exitLoopMode() }}>
           Exit loop
         </button>
       ) : (
@@ -65,13 +69,15 @@ export function TransportBar() {
           Find loops
         </button>
       )}
-      <div className="transport__time" aria-live="polite">
+      {looping && <button className="btn btn--small" disabled={!candidates.length}
+        onClick={() => adaptiveOpen ? closeAdaptive() : openAdaptive()}>{adaptiveOpen ? 'Loop editor' : 'Adaptive preview'}</button>}
+      {adaptiveOpen && looping ? <div className="transport__time">{adaptiveCurrent ?? 'Adaptive preview stopped'}</div> : <div className="transport__time" aria-live="polite">
         <span>{fmt(playhead)}</span>
         <span className="transport__muted"> / {fmt(end)}</span>
         {looping && bpm != null && (
-          <span className="transport__muted"> · ~{Math.round(bpm)} BPM{isPlaying ? ' · looping' : ''}</span>
+          <span className="transport__muted"> · ~{Math.round(cand?.bpm ?? bpm)} BPM{isPlaying ? ' · looping' : ''}</span>
         )}
-      </div>
+      </div>}
     </header>
   )
 }

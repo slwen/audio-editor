@@ -65,3 +65,15 @@ describe('filterLoopCandidates', () => {
     expect(out.map((c) => c.id)).toEqual(['c'])
   })
 })
+
+it('uses listening decisions and feel tags consistently without changing quality scores', () => {
+  const good = cand({ id: 'good', bars: 4, startSec: 1, endSec: 9, qualityScore: 0.6 })
+  const bad = cand({ id: 'bad', bars: 4, startSec: 10, endSec: 18, qualityScore: 0.95 })
+  const opts = { minQuality: 0, minVibe: 0, barFilter: 'all' as const, lengthFilter: 'all' as const,
+    sourceName: 'song', ratings: { 'song|4|10.00|18.00': 'bad' as const },
+    tags: { 'song|4|1.00|9.00': ['combat' as const] } }
+  expect(filterLoopCandidates([bad, good], { ...opts, reviewFilter: 'not-bad' })).toEqual([good])
+  expect(filterLoopCandidates([bad, good], { ...opts, reviewFilter: 'all' })).toEqual([bad, good])
+  expect(filterLoopCandidates([bad, good], { ...opts, feelFilter: 'combat' })).toEqual([good])
+  expect(bad.qualityScore).toBe(0.95)
+})

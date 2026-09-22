@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:loops": "node scripts/eval-ratings.mjs"
   },
   "dependencies": {
     "@soundtouchjs/audio-worklet": "^1.0.10",

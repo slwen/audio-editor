@@ -1,3 +1,4 @@
+import { renderLoopChannels, type LoopRenderOptions } from '@/loop/wrapLoop'
 import { SoundTouchNode } from '@soundtouchjs/audio-worklet'
 import { ensureSoundTouchWorklet } from '@/audio/ensureSoundTouchWorklet'
 import { scheduleTimelineGainFade } from '@/audio/scheduleGainFade'
@@ -20,6 +21,13 @@ type ActiveChain = {
 }
 
 export class AudioEngine {
+  private stopListeners = new Set<() => void>()
+
+  onStop(listener: () => void): () => void {
+    this.stopListeners.add(listener)
+    return () => { this.stopListeners.delete(listener) }
+  }
+
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private active: ActiveChain[] = []
@@ -62,6 +70,7 @@ export class AudioEngine {
   }
 
   stop(): void {
+    this.stopListeners.forEach(listener => listener())
     this.sessionPlaying = false
     this.loopLen = 0
     this.loopStart = 0
@@ -197,7 +206,8 @@ export class AudioEngine {
     endSec: number,
     gainLinear: number,
     onTick?: (sourceT: number) => void,
-    playFromSec?: number
+    playFromSec?: number,
+    renderOptions?: LoopRenderOptions
   ): void {
     this.stop()
     const ctx = this.ctx
@@ -220,15 +230,20 @@ export class AudioEngine {
     this.projectEndTime = Number.POSITIVE_INFINITY
 
     const source = ctx.createBufferSource()
-    source.buffer = buf
+    if (renderOptions) {
+      const rendered = renderLoopChannels(buf, start, end, renderOptions)
+      const baked = ctx.createBuffer(rendered.channels.length, rendered.channels[0]!.length, rendered.sampleRate)
+      rendered.channels.forEach((channel, index) => baked.getChannelData(index).set(channel))
+      source.buffer = baked
+    } else source.buffer = buf
     source.loop = true
-    source.loopStart = start
-    source.loopEnd = end
+    source.loopStart = renderOptions ? 0 : start
+    source.loopEnd = renderOptions ? source.buffer!.duration : end
     const gain = ctx.createGain()
     gain.gain.value = clampLinearGain(gainLinear)
     source.connect(gain)
     gain.connect(master)
-    source.start(ctx.currentTime, from)
+    source.start(ctx.currentTime, renderOptions ? from - start : from)
     this.active.push({ clipId: 'loop-preview', source, st: null, gain })
 
     const tick = () => {

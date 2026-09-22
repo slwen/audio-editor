@@ -27,7 +27,7 @@ export function writeWavStereo16(floatBuffer: AudioBuffer): ArrayBuffer {
   const ch1 = numCh > 1 ? floatBuffer.getChannelData(1) : ch0
   let o = 44
   for (let i = 0; i < n; i++) {
-    for (const ch of [ch0, ch1]) {
+    for (const ch of (numCh === 1 ? [ch0] : [ch0, ch1])) {
       const s = Math.max(-1, Math.min(1, ch[i] ?? 0))
       v.setInt16(o, Math.max(-32768, Math.min(32767, Math.round(s * 32767))), true)
       o += 2

@@ -1,16 +1,56 @@
-/** Equal-power mix of the tail onto the head. Output length is unchanged. */
-export function bakeWrapEqualPower(channel: Float32Array, fadeSamples: number): void {
+/**
+ * Blend the source continuation AFTER the end into the loop head. Replaying
+ * the previous tail here repeats time and creates a new jump at the wrap.
+ * Complementary raised-cosine gains preserve correlated audio without +3dB.
+ */
+export function bakeWrapCrossfade(
+  channel: Float32Array, fadeSamples: number, continuation?: Float32Array
+): void {
   const n = channel.length
-  const fade = Math.max(0, Math.min(fadeSamples, Math.floor(n / 4)))
+  const fade = Math.max(0, Math.min(Math.floor(fadeSamples), Math.floor(n / 4)))
   if (fade < 2) return
+  const last = channel[n - 1] ?? 0
   for (let i = 0; i < fade; i++) {
-    const t = i / (fade - 1)
-    const fadeIn = Math.sin((t * Math.PI) / 2)
-    const fadeOut = Math.cos((t * Math.PI) / 2)
-    const head = channel[i] ?? 0
-    const tail = channel[n - fade + i] ?? 0
-    channel[i] = head * fadeIn + tail * fadeOut
+    const mix = 0.5 - 0.5 * Math.cos(Math.PI * i / (fade - 1))
+    // At EOF use a short decaying endpoint correction rather than silence or
+    // a duplicate tail. It leaves the body and the exact bar duration intact.
+    const from = continuation && continuation.length >= fade
+      ? continuation[i]!
+      : last
+    channel[i] = from * (1 - mix) + channel[i]! * mix
   }
+}
+
+export type LoopRenderOptions = { wrapCrossfadeSec: number; normalize: boolean }
+
+/** Long musical blends need real continuation; EOF only permits click repair. */
+export function effectiveLoopCrossfadeSec(
+  buffer: AudioBuffer, startSec: number, endSec: number, requestedSec: number
+): number {
+  const start = Math.max(0, Math.round(startSec * buffer.sampleRate))
+  const end = Math.min(buffer.length, Math.round(endSec * buffer.sampleRate))
+  const remaining = buffer.length - end
+  const repair = Math.max(2, Math.round(0.005 * buffer.sampleRate))
+  const available = remaining >= repair ? remaining : repair
+  const requested = Number.isFinite(requestedSec) ? Math.max(0, Math.round(requestedSec * buffer.sampleRate)) : 0
+  const count = Math.max(0, Math.min(requested, available, Math.floor((end - start) / 4)))
+  return (count >= 2 ? count : 0) / buffer.sampleRate
+}
+
+/** Shared by preview, exported WAVs and clips copied into the editor. */
+export function renderLoopChannels(
+  buffer: AudioBuffer, startSec: number, endSec: number, opts: LoopRenderOptions
+): { channels: Float32Array[]; sampleRate: number; wrapCrossfadeSec: number } {
+  const result = sliceBufferChannels(buffer, startSec, endSec)
+  const end = Math.min(buffer.length, Math.round(endSec * buffer.sampleRate))
+  const wrapCrossfadeSec = effectiveLoopCrossfadeSec(buffer, startSec, endSec, opts.wrapCrossfadeSec)
+  const fade = Math.round(wrapCrossfadeSec * buffer.sampleRate)
+  const hasContinuation = buffer.length - end >= Math.max(2, Math.round(0.005 * buffer.sampleRate))
+  result.channels.forEach((channel, index) => {
+    bakeWrapCrossfade(channel, fade, hasContinuation ? buffer.getChannelData(index).subarray(end, end + fade) : undefined)
+  })
+  if (opts.normalize) peakNormalize(result.channels)
+  return { ...result, wrapCrossfadeSec }
 }
 
 export function peakNormalize(channels: Float32Array[], peak = 0.89): void {
@@ -31,8 +71,8 @@ export function sliceBufferChannels(
   endSec: number
 ): { channels: Float32Array[]; sampleRate: number } {
   const sr = buffer.sampleRate
-  const a = Math.max(0, Math.floor(startSec * sr))
-  const b = Math.min(buffer.length, Math.max(a + 1, Math.floor(endSec * sr)))
+  const a = Math.max(0, Math.round(startSec * sr))
+  const b = Math.min(buffer.length, Math.max(a + 1, Math.round(endSec * sr)))
   const len = b - a
   const channels: Float32Array[] = []
   const nch = buffer.numberOfChannels

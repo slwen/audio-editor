@@ -37,8 +37,13 @@ export function LoopTimeline() {
   const bufferId = useLoopStore((s) => s.bufferId)
   const trimStart = useLoopStore((s) => s.trimStart)
   const trimEnd = useLoopStore((s) => s.trimEnd)
-  const bpm = useLoopStore((s) => s.bpm)
-  const beatOffsetSec = useLoopStore((s) => s.beatOffsetSec)
+  const detectedBpm = useLoopStore((s) => s.bpm)
+  const detectedOffset = useLoopStore((s) => s.beatOffsetSec)
+  const feelFilter = useLoopStore(s => s.feelFilter)
+  const reviewFilter = useLoopStore(s => s.reviewFilter)
+  const ratings = useLoopStore(s => s.ratings)
+  const tags = useLoopStore(s => s.tags)
+  const candidateView = useLoopStore(s => s.candidateView)
   const candidates = useLoopStore((s) => s.candidates)
   const minQuality = useLoopStore((s) => s.minQuality)
   const minVibe = useLoopStore((s) => s.minVibe)
@@ -46,6 +51,9 @@ export function LoopTimeline() {
   const lengthFilter = useLoopStore((s) => s.lengthFilter)
   const selectedIds = useLoopStore((s) => s.selectedIds)
   const previewId = useLoopStore((s) => s.previewId)
+  const savedPreview = candidates.find(c => c.id === previewId && c.origin === 'saved')
+  const bpm = savedPreview?.bpm ?? detectedBpm
+  const beatOffsetSec = savedPreview?.startSec ?? detectedOffset
   const status = useLoopStore((s) => s.status)
   const sourceName = useLoopStore((s) => s.sourceName)
   const playhead = useProjectStore((s) => s.playhead)
@@ -55,8 +63,8 @@ export function LoopTimeline() {
 
   const duration = Math.max(0.01, trimEnd - trimStart)
   const visible = useMemo(
-    () => filterLoopCandidates(candidates, { minQuality, minVibe, barFilter, lengthFilter }),
-    [candidates, minQuality, minVibe, barFilter, lengthFilter]
+    () => filterLoopCandidates(candidates, { minQuality, minVibe, barFilter, lengthFilter, candidateView, sourceName, ratings, tags, feelFilter, reviewFilter }),
+    [candidates, candidateView, minQuality, minVibe, barFilter, lengthFilter, sourceName, ratings, tags, feelFilter, reviewFilter]
   )
 
   const tx = useCallback(

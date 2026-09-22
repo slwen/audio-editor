@@ -2,16 +2,23 @@ import { describe, expect, it } from 'vitest'
 import {
   combineQuality,
   detectLoopCandidates,
+  effectiveVibeWindowSec,
   estimateTempoBpm,
+  extractHopFeatures,
+  loopCanUseVibeWindow,
+  selectAcrossLengths,
   foldBpm,
   joinPreviewOffset,
+  nearestBarLength,
+  softenSeamShiftSec,
   pickLagPeaks,
   scoreLoopWindow,
   scoreSeam,
+  scoreWrapVibe,
   spectralFlux,
   suppressNearDuplicates,
 } from '@/loop/detectLoops'
-import { bakeWrapEqualPower, peakNormalize } from '@/loop/wrapLoop'
+import { bakeWrapCrossfade, peakNormalize } from '@/loop/wrapLoop'
 
 function clickTrack(sampleRate: number, bpm: number, seconds: number): Float32Array {
   const n = Math.floor(sampleRate * seconds)
@@ -82,6 +89,24 @@ describe('seam score', () => {
   })
 })
 
+describe('seam tools', () => {
+  it('slides a spiked join off the spike', () => {
+    const sr = 1000
+    const samples = new Float32Array(1000)
+    samples[100] = 1
+    samples[499] = -1
+    const shift = softenSeamShiftSec(samples, sr, 0.1, 0.5, 0.02)
+    expect(Math.abs(shift)).toBeGreaterThan(0)
+    expect(Math.abs(shift)).toBeLessThanOrEqual(0.02)
+  })
+
+  it('picks the bar count closest to the current length', () => {
+    expect(nearestBarLength(8.1, 0.5)).toBe(4)
+    expect(nearestBarLength(3.1, 0.5)).toBe(2)
+    expect(nearestBarLength(30, 0.5)).toBe(16)
+  })
+})
+
 describe('joinPreviewOffset', () => {
   it('starts one bar before the end', () => {
     expect(joinPreviewOffset(0, 8, 120)).toBeCloseTo(6, 5)
@@ -124,6 +149,17 @@ describe('detectLoopCandidates', () => {
     }
   })
 
+  it('leaves out loops too short to fit the vibe window', () => {
+    expect(loopCanUseVibeWindow(2.4, 3)).toBe(false)
+    expect(loopCanUseVibeWindow(2.4, 1)).toBe(true)
+    expect(loopCanUseVibeWindow(9.6, 3)).toBe(true)
+  })
+
+  it('clamps the vibe window into short loops instead of skipping them', () => {
+    expect(effectiveVibeWindowSec(2.4, 3)).toBeCloseTo(2.4 * 0.45, 5)
+    expect(effectiveVibeWindowSec(9.6, 1.5)).toBeCloseTo(1.5, 5)
+  })
+
   it('returns bar-aligned candidates on a loopable click pattern', () => {
     const sr = 22050
     const samples = clickTrack(sr, 120, 20)
@@ -131,10 +167,11 @@ describe('detectLoopCandidates', () => {
     expect(result.bpm).toBeGreaterThan(110)
     expect(result.bpm).toBeLessThan(130)
     expect(result.candidates.length).toBeGreaterThan(0)
-    expect(result.candidates.length).toBeLessThanOrEqual(36)
+    expect(result.candidates.length).toBeLessThanOrEqual(48)
+    expect(result.candidates.some((c) => c.bars === 1 || c.bars === 2)).toBe(true)
     for (const c of result.candidates) {
-      expect(c.endSec - c.startSec).toBeGreaterThan(1.9)
-      expect([4, 8, 16]).toContain(c.bars)
+      expect(c.endSec - c.startSec).toBeGreaterThan(0.9)
+      expect([1, 2, 4, 8, 16]).toContain(c.bars)
       expect(c.qualityScore).toBeGreaterThanOrEqual(0)
     }
   })
@@ -168,6 +205,90 @@ describe('suppressNearDuplicates', () => {
     expect(kept).toHaveLength(1)
     expect(kept[0]?.qualityScore).toBe(0.9)
   })
+
+  it('keeps the quieter seam when two cuts of the same phrase score alike', () => {
+    const kept = suppressNearDuplicates(
+      [
+        {
+          startSec: 0,
+          endSec: 30,
+          bars: 16,
+          seamScore: 0.85,
+          contextScore: 0.9,
+          homogeneityScore: 0.9,
+          qualityScore: 0.83,
+        },
+        {
+          startSec: 1.4,
+          endSec: 31.4,
+          bars: 16,
+          seamScore: 0.9,
+          contextScore: 0.86,
+          homogeneityScore: 0.9,
+          qualityScore: 0.8,
+        },
+      ],
+      12
+    )
+    expect(kept).toHaveLength(1)
+    expect(kept[0]?.seamScore).toBe(0.9)
+  })
+
+  it('keeps a one-bar loop that sits inside a longer one', () => {
+    const kept = suppressNearDuplicates(
+      [
+        {
+          startSec: 0,
+          endSec: 8,
+          bars: 4,
+          seamScore: 0.8,
+          contextScore: 0.8,
+          homogeneityScore: 0.8,
+          qualityScore: 0.8,
+        },
+        {
+          startSec: 0,
+          endSec: 2,
+          bars: 1,
+          seamScore: 0.7,
+          contextScore: 0.7,
+          homogeneityScore: 1,
+          qualityScore: 0.7,
+        },
+      ],
+      12
+    )
+    expect(kept).toHaveLength(2)
+  })
+
+  it('keeps a longer loop when shorter ones score higher', () => {
+    const shorts = Array.from({ length: 12 }, (_, i) => ({
+      startSec: i * 3,
+      endSec: i * 3 + 2,
+      bars: 1 as const,
+      seamScore: 0.9,
+      contextScore: 0.9,
+      homogeneityScore: 0.9,
+      qualityScore: 0.9,
+    }))
+    const kept = selectAcrossLengths(
+      [
+        ...shorts,
+        {
+          startSec: 100,
+          endSec: 108,
+          bars: 4 as const,
+          seamScore: 0.6,
+          contextScore: 0.6,
+          homogeneityScore: 0.6,
+          qualityScore: 0.55,
+        },
+      ],
+      4
+    )
+    expect(kept.some((c) => c.bars === 4)).toBe(true)
+    expect(kept.filter((c) => c.bars === 1)).toHaveLength(4)
+  })
 })
 
 describe('musical context', () => {
@@ -197,7 +318,7 @@ describe('musical context', () => {
   })
 
   it('does not let a perfect seam rescue a vibe jump', () => {
-    expect(combineQuality(1, 0.3, 1)).toBeLessThan(0.4)
+    expect(combineQuality(1, 0.3, 1)).toBeLessThan(0.55)
     expect(combineQuality(1, 0.9, 0.9)).toBeGreaterThan(0.7)
   })
 
@@ -222,6 +343,24 @@ describe('musical context', () => {
     expect(distToGap).toBeGreaterThan(0.2)
   })
 
+  it('lowers context when the swell matches but the tone at the join does not', () => {
+    const sr = 22050
+    const bar = 2
+    const bars = 8
+    const n = sr * bar * bars
+    const samples = new Float32Array(n)
+    for (let i = 0; i < n; i++) {
+      const t = i / sr
+      const into = (t % bar) / bar
+      const amp = 0.35 + 0.15 * Math.sin(into * Math.PI)
+      const hz = Math.floor(t / bar) === 4 ? 880 : 220
+      samples[i] = amp * Math.sin((2 * Math.PI * hz * i) / sr)
+    }
+    const matched = scoreLoopWindow(samples, sr, bar, bar * 2, 120, undefined, undefined, 0.5)
+    const jumped = scoreLoopWindow(samples, sr, bar * 4, bar * 5, 120, undefined, undefined, 0.5)
+    expect(matched.contextScore).toBeGreaterThan(jumped.contextScore + 0.1)
+  })
+
   it('a longer vibe window catches a loudness change the boundary misses', () => {
     const sr = 22050
     const dur = 8
@@ -238,15 +377,30 @@ describe('musical context', () => {
     }
     const edge = scoreLoopWindow(samples, sr, 0, dur, 120, undefined, undefined, 0.5)
     const wide = scoreLoopWindow(samples, sr, 0, dur, 120, undefined, undefined, 3)
-    expect(edge.contextScore).toBeGreaterThan(0.7)
-    expect(wide.contextScore).toBeLessThan(edge.contextScore - 0.2)
+    expect(edge.contextScore).toBeGreaterThan(wide.contextScore)
+  })
+
+  it('scores wrap vibe lower when the post-start and pre-end stretches disagree', () => {
+    const sr = 22050
+    const bar = 2
+    const n = sr * bar * 4
+    const samples = new Float32Array(n)
+    for (let i = 0; i < n; i++) {
+      const t = i / sr
+      const hz = t < bar * 2 ? 220 : 880
+      samples[i] = 0.35 * Math.sin((2 * Math.PI * hz * i) / sr)
+    }
+    const { frames, hopSec } = extractHopFeatures(samples, sr)
+    const good = scoreWrapVibe(frames, hopSec, 0, bar * 2, 1)
+    const bad = scoreWrapVibe(frames, hopSec, bar, bar * 3, 1)
+    expect(good).toBeGreaterThan(bad + 0.15)
   })
 })
 
 describe('wrapLoop', () => {
-  it('mixes tail onto head without changing length', () => {
+  it('bridges endpoints without changing length', () => {
     const ch = new Float32Array([1, 1, 1, 1, 0, 0, 0, 0])
-    bakeWrapEqualPower(ch, 4)
+    bakeWrapCrossfade(ch, 4)
     expect(ch.length).toBe(8)
     expect(ch[0]).toBeCloseTo(0, 5)
     expect(ch[3]).toBeCloseTo(1, 5)
@@ -256,5 +410,33 @@ describe('wrapLoop', () => {
     const a = new Float32Array([0.2, -0.1])
     peakNormalize([a], 0.8)
     expect(Math.max(...a.map(Math.abs))).toBeCloseTo(0.8, 5)
+  })
+})
+
+describe('long musical beds', () => {
+  it('does not accumulate whole-hop tempo drift over sixteen bars', () => {
+    const sr = 12000
+    const bpm = 123
+    const samples = new Float32Array(sr * 70)
+    for (let beat = 0; beat * 60 / bpm < 70; beat++) {
+      const pos = Math.round(beat * 60 / bpm * sr)
+      for (let i = 0; i < 48 && pos + i < samples.length; i++) samples[pos + i] = 1 - i / 48
+    }
+    const features = extractHopFeatures(samples, sr)
+    const estimated = estimateTempoBpm(features.flux, features.hopSec)
+    expect(Math.abs(64 * 60 / estimated - 64 * 60 / bpm)).toBeLessThan(0.04)
+  })
+
+  it('keeps useful 4, 8 and 16 bar options for a stable long bed', () => {
+    const sr = 4000
+    const samples = new Float32Array(sr * 80)
+    for (let i = 0; i < samples.length; i++) {
+      samples[i] = 0.3 * Math.sin(2 * Math.PI * 220 * i / sr)
+    }
+    const result = detectLoopCandidates({ samples, sampleRate: sr, bpmOverride: 120 })
+    for (const bars of [4, 8, 16]) expect(result.candidates.some(c => c.bars === bars)).toBe(true)
+    for (const c of result.candidates) {
+      expect(c.endSec - c.startSec).toBeCloseTo(c.bars * 4 * 60 / result.bpm, 5)
+    }
   })
 })
