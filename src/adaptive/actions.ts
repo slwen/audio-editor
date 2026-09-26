@@ -15,6 +15,7 @@ import { activeMusicSlots, approvedExitPoints, DEFAULT_MUSIC_SETTINGS, MUSIC_STA
 import { saveAdaptive, useAdaptiveStore } from './store'
 import { mergeTransitionReviews, syncTransitionRecords } from './transitionRatings'
 import { draftZoneLoops, songZones, type ZoneFlag } from './zonePlan'
+import { saveSongZones } from '@/pack/songZones'
 
 let syncQueue = Promise.resolve()
 export function syncTransitionFeedback(): Promise<void> {
@@ -126,6 +127,15 @@ export function openAdaptive(): void {
   useAdaptiveStore.setState({ open: true, storageKey, slots, settings, reviews, initialState, rules, zoneFlags, zoneDraft,
     error, playback: STOPPED_MUSIC })
   void syncTransitionFeedback()
+  if (zoneFlags.length) persistZoneFlags()
+}
+
+/** Offline pack tools read markers from song-zones.json; the browser copy stays the working state. */
+function persistZoneFlags(): void {
+  const loop = useLoopStore.getState()
+  const { zoneFlags } = useAdaptiveStore.getState()
+  saveSongZones({ sourceName: loop.sourceName, trimStartSec: loop.trimStart, trimEndSec: loop.trimEnd, flags: zoneFlags })
+    .catch(() => useAdaptiveStore.setState({ error: 'Song markers are saved in this browser but not on disk. Is the dev server running?' }))
 }
 
 export function setZoneFlag(timeSec: number, state: 'exploration' | 'combat'): void {
@@ -137,11 +147,13 @@ export function setZoneFlag(timeSec: number, state: 'exploration' | 'combat'): v
     : [...setup.zoneFlags, { id: crypto.randomUUID(), timeSec, state }]
   useAdaptiveStore.setState({ zoneFlags: next.sort((a, b) => a.timeSec - b.timeSec), zoneDraft: false, error: '' })
   saveAdaptive()
+  persistZoneFlags()
 }
 
 export function removeZoneFlag(id: string): void {
   useAdaptiveStore.setState(s => ({ zoneFlags: s.zoneFlags.filter(f => f.id !== id), zoneDraft: false, error: '' }))
   saveAdaptive()
+  persistZoneFlags()
 }
 
 export function generateZoneDraft(): void {
@@ -372,7 +384,8 @@ function bake(slot: MusicSlot): AudioBuffer {
 }
 
 export async function startAdaptive(state = useAdaptiveStore.getState().initialState, firstSlot?: MusicSlot,
-  startOffsetSec = 0, focus?: Partial<Record<MusicState, string>>, previewRules?: TransitionRules): Promise<void> {
+  startOffsetSec = 0, focus?: Partial<Record<MusicState, string>>, previewRules?: TransitionRules,
+  playbackSettings?: MusicSettings): Promise<void> {
   audioEngine.stop()
   useProjectStore.getState().setIsPlaying(false)
   const gen = generation
@@ -401,7 +414,7 @@ export async function startAdaptive(state = useAdaptiveStore.getState().initialS
     output.gain.value = project.masterGain * (clip?.gain ?? 1)
     output.connect(ctx.destination)
     player = new AdaptivePlayer(ctx, output)
-    player.configure(library, setup.settings, { ...setup.rules, ...previewRules })
+    player.configure(library, playbackSettings ?? setup.settings, { ...setup.rules, ...previewRules })
     const first = firstSlot ? setup.slots[state]!.find(slot => slot.key === firstSlot.key) : setup.slots[state]![0]
     if (!first) throw new Error('The starting section is no longer in this feel.')
     player.start(state, first, buffers.get(bufferKey(first))!, startOffsetSec)
@@ -420,6 +433,24 @@ export async function startAdaptive(state = useAdaptiveStore.getState().initialS
     stopAdaptive()
     useAdaptiveStore.setState({ error: error instanceof Error ? error.message : 'Could not start adaptive playback.' })
   }
+}
+
+/** A deliberate same-feel move, scheduled on the playing loop's bar grid. */
+export function requestBed(state: MusicState, slot: MusicSlot): boolean {
+  const setup = useAdaptiveStore.getState()
+  if (!setup.slots[state]?.some(available => available.key === slot.key)) return false
+  if (!player) { void startAdaptive(state, slot, 0, undefined, undefined, { ...setup.settings, advance: false }); return true }
+  const playback = player.snapshot()
+  if (playback.current !== state || !playback.currentSlot) return false
+  if (setup.rules[passagePairKey(playback.currentSlot, slot)]?.blocked) {
+    useAdaptiveStore.setState({ error: 'This section change is blocked. Choose another section.' })
+    return false
+  }
+  const buffer = buffers.get(bufferKey(slot))
+  if (!buffer) { useAdaptiveStore.setState({ error: 'This section is not ready. Restart the preview.' }); return false }
+  player.request(state, slot, buffer, { ...setup.settings, exitBars: 4, fadeBeats: 4 })
+  useAdaptiveStore.setState({ playback: player.snapshot(), error: '' })
+  return true
 }
 
 /** Audition one directed route without making it available to automatic playback. */

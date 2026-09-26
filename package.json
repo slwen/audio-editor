@@ -9,7 +9,14 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "eval:loops": "node scripts/eval-ratings.mjs"
+    "eval:loops": "node scripts/eval-ratings.mjs",
+    "eval:jumps": "node scripts/run-ts.mjs scripts/eval-jumps.ts",
+    "calibrate:jumps": "node scripts/run-ts.mjs scripts/calibrate-jumps.ts",
+    "analyze": "node scripts/run-ts.mjs scripts/analyze-song.ts",
+    "build-pack": "node scripts/run-ts.mjs scripts/build-pack.ts",
+    "simulate": "node scripts/run-ts.mjs scripts/simulate-pack.ts",
+    "export-pack": "node scripts/run-ts.mjs scripts/export-pack.ts",
+    "split-stems": "node scripts/run-ts.mjs scripts/split-stems.ts"
   },
   "dependencies": {
     "@soundtouchjs/audio-worklet": "^1.0.10",

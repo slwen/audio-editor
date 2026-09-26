@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { LoopCandidate } from '@/loop/types'
 import { loopRatingKey } from '@/loop/loopRatings'
 import type { useLoopStore } from '@/store/useLoopStore'
-import { activeMusicSlots, passagePairKey, type MusicSlot } from './model'
-import { chooseFocusedPair, draftZoneLoops, longestExitWait, routesForEachHold, songZones, suggestRoutes } from './zonePlan'
+import { activeMusicSlots, passagePairKey, type MusicSlot, type TransitionRules } from './model'
+import { assessSectionCoverage, chooseFocusedPair, draftZoneLoops, longestExitWait, nextBed, orderedBeds, reachableSections, routesForEachHold,
+  songZones, suggestRoutes } from './zonePlan'
 
 const candidate = (startSec: number, bars: 4 | 16): LoopCandidate => ({
   id: String(startSec), startSec, endSec: startSec + bars * 2.4375, bars, bpm: 98.46,
@@ -98,7 +99,7 @@ describe('zone draft', () => {
     const nearCombat = slot(142, 16)
     const lateCombat = slot(198, 4)
     const slots = { exploration: [earlyExploration, nearExploration], combat: [nearCombat, lateCombat] }
-    const rules = {
+    const rules: TransitionRules = {
       [passagePairKey(earlyExploration, lateCombat)]: { approved: true },
       [passagePairKey(nearCombat, nearExploration)]: { approved: true },
     }
@@ -108,5 +109,44 @@ describe('zone draft', () => {
     expect(activeMusicSlots(slots, 'exploration', focus)).toEqual([nearExploration])
     expect(activeMusicSlots(slots, 'combat', focus)).toEqual([nearCombat])
     expect(slots.combat).toHaveLength(2)
+  })
+
+  it('moves through beds in song order and wraps after the last one', () => {
+    const slot = (time: number, bars: 4 | 16): MusicSlot => ({ key: String(time), candidate: candidate(time, bars),
+      render: { wrapCrossfadeSec: 0.05, normalize: false } })
+    const first = slot(72, 4)
+    const middle = slot(142, 16)
+    const last = slot(197, 4)
+    const passage = { ...slot(160, 4), kind: 'passage' as const }
+    const beds = orderedBeds([last, passage, middle, first])
+    expect(beds).toEqual([first, middle, last])
+    expect(nextBed(beds, first.key)).toBe(middle)
+    expect(nextBed(beds, middle.key)).toBe(last)
+    expect(nextBed(beds, last.key)).toBe(first)
+    expect(nextBed([first], first.key)).toBeUndefined()
+  })
+
+  it('reports directed mood-switch coverage and the longest wait for each section', () => {
+    const slot = (time: number): MusicSlot => ({ key: String(time), candidate: candidate(time, 4),
+      render: { wrapCrossfadeSec: 0.05, normalize: false } })
+    const first = slot(52)
+    const extra = slot(130)
+    const combat = slot(72)
+    const rules: TransitionRules = {
+      [passagePairKey(first, combat)]: { approved: true, approvedExits: [{ exitBar: 0 }, { exitBar: 2 }] },
+      [passagePairKey(combat, first)]: { approved: true, approvedExits: [{ exitBar: 1 }] },
+      [passagePairKey(extra, combat)]: { approved: false, approvedExits: [{ exitBar: 0 }] },
+    }
+    const coverage = assessSectionCoverage({ exploration: [first, extra], combat: [combat] }, rules)
+    expect(coverage.map(section => ({ key: section.slot.key, points: section.switchPoints,
+      incoming: section.incomingRoutes, wait: section.longestSwitchWaitSec }))).toEqual([
+      { key: first.key, points: 2, incoming: 1, wait: 4.875 },
+      { key: extra.key, points: 0, incoming: 0, wait: null },
+      { key: combat.key, points: 1, incoming: 1, wait: 9.75 },
+    ])
+    const beds = { exploration: [first, extra], combat: [combat] }
+    expect(reachableSections(beds, rules, { feel: 'exploration', slot: first }).size).toBe(2)
+    rules[passagePairKey(first, extra)] = { approved: true, approvedExits: [{ exitBar: 1 }] }
+    expect(reachableSections(beds, rules, { feel: 'exploration', slot: first }).size).toBe(3)
   })
 })

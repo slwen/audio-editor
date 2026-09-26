@@ -13,7 +13,10 @@ dist-ssr
 *.local
 loop-ratings.jsonl
 transition-ratings.jsonl
+song-zones.json
+pack-ratings.jsonl
 sample_songs/
+analysis/
 
 # Editor directories and files
 .vscode/*

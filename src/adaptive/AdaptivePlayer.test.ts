@@ -130,6 +130,19 @@ describe('passage progression', () => {
     expect(player.snapshot()).toMatchObject({ current: 'combat', currentSlot: c,
       transition: { from: 'combat', to: 'combat' } })
   })
+  it('holds each bed until a manual next-bed request and then holds the new bed', () => {
+    const { player, buffer, ctx, sources } = fixture()
+    player.configure({ combat: [{ slot: a, buffer }, { slot: b, buffer }] },
+      { ...DEFAULT_MUSIC_SETTINGS, approvedOnly: true, advance: false }, {})
+    player.start('combat', a, buffer)
+    expect(player.snapshot().nextSlot).toBeUndefined()
+    ctx.currentTime = 0.5
+    player.request('combat', b, buffer, { ...DEFAULT_MUSIC_SETTINGS, exitBars: 4, fadeBeats: 4 })
+    expect(sources.at(-1)!.start).toHaveBeenCalledWith(8.08)
+    ctx.currentTime = 8.1
+    expect(player.snapshot()).toMatchObject({ current: 'combat', currentSlot: b, nextSlot: undefined,
+      transition: { from: 'combat', to: 'combat' } })
+  })
   it('schedules a continuous source passage then a return to a bed, without waiting for a game event', () => {
     const { player, buffer, ctx } = fixture()
     const passage = { ...b, kind: 'passage' as const }

@@ -43,7 +43,7 @@ export function loopCanUseVibeWindow(loopSec: number, windowSec: number): boolea
   return loopSec * 0.45 + 1e-6 >= windowSec
 }
 
-type FrameFeatures = {
+export type FrameFeatures = {
   chroma: Float32Array
   timbre: Float32Array
   /** Log band energy, not normalized, so loudness and tone both survive. */
@@ -55,7 +55,7 @@ type FrameFeatures = {
   flux: number
 }
 
-type TransitionModel = {
+export type TransitionModel = {
   scales: { width: number; distances: number[] }[]
 }
 
@@ -370,7 +370,7 @@ function wrapCorrelation(samples: Float32Array, start: number, end: number, n: n
   if (len < 8) return 0
   const a0 = start
   const b0 = end - len
-  if (b0 < start) return 0
+  if (b0 < 0 || start < 0) return 0
   let meanA = 0
   let meanB = 0
   for (let i = 0; i < len; i++) {
@@ -407,9 +407,13 @@ export function scoreSeam(
 
   const beatSec = 60 / Math.max(1, bpm)
   const beatN = Math.max(16, Math.floor(beatSec * 2 * sampleRate))
-  const firstEnd = Math.min(end, start + beatN)
-  const lastStart = Math.max(start, end - beatN)
+  return seamAcross(samples, sampleRate, start, end, Math.min(end, start + beatN), Math.max(start, end - beatN),
+    end, rms(samples, start, end))
+}
 
+/** Sample-level join from `end` into `start`. The two sides may be anywhere in the source. */
+function seamAcross(samples: Float32Array, sampleRate: number, start: number, end: number,
+  firstEnd: number, lastStart: number, headLimit: number, loopRms: number): number {
   const r1 = rms(samples, start, firstEnd)
   const r2 = rms(samples, lastStart, end)
   const rmsMatch = Math.min(r1, r2) / Math.max(r1, r2, 1e-8)
@@ -423,10 +427,9 @@ export function scoreSeam(
 
   const headN = Math.max(4, Math.floor(ONSET_HEAD_SEC * sampleRate))
   let peakHead = 0
-  for (let i = start; i < start + headN && i < end; i++) {
+  for (let i = start; i < start + headN && i < headLimit; i++) {
     peakHead = Math.max(peakHead, Math.abs(samples[i] ?? 0))
   }
-  const loopRms = rms(samples, start, end)
   const onsetPen = Math.max(0, Math.min(1, (peakHead - loopRms * 4) / (loopRms * 8 + 1e-6)))
 
   // Derivative discontinuity across the join → audible click/clack.
@@ -552,7 +555,7 @@ function spanDistance(frames: FrameFeatures[], a0: number, a1: number, b0: numbe
   return 0.4 * meanD + 0.6 * (seq / Math.max(1, count))
 }
 
-function buildTransitionModel(
+export function buildTransitionModel(
   frames: FrameFeatures[],
   hopSec: number,
   beatSec: number,
@@ -612,7 +615,7 @@ function scoreJoinContinuity(
   for (const scale of model.scales) {
     const width = scale.width
     if (width < 4 || scale.distances.length === 0) continue
-    if (endF - startF < width * 2) continue
+    if (Math.abs(endF - startF) < width * 2) continue
     const pre = endF - width
     if (pre < 0 || startF + width > frames.length) continue
     const distance = spanDistance(frames, pre, endF, startF, startF + width)
@@ -678,7 +681,10 @@ export function scoreWrapVibe(
 ): number {
   if (frames.length < 4 || hopSec <= 0 || windowSec <= 0) return 0
   const dur = endSec - startSec
-  const w = Math.min(windowSec, Math.max(0.2, dur * 0.45))
+  return vibeAcross(frames, hopSec, startSec, endSec, Math.min(windowSec, Math.max(0.2, dur * 0.45)))
+}
+
+function vibeAcross(frames: FrameFeatures[], hopSec: number, startSec: number, endSec: number, w: number): number {
   const a0 = frameAt(startSec, hopSec, frames.length)
   const a1 = Math.max(a0 + 1, frameAt(startSec + w, hopSec, frames.length) + 1)
   const b1 = frameAt(endSec, hopSec, frames.length) + 1
@@ -1003,6 +1009,51 @@ export function scoreLoopWindow(
     homogeneityScore,
     closureScore,
     qualityScore: combineQuality(seamScore, contextScore, homogeneityScore) * Math.pow(closureScore, 0.7),
+  }
+}
+
+export type JumpScore = {
+  seamScore: number
+  vibeScore: number
+  joinScore: number
+  closureScore: number
+  qualityScore: number
+}
+
+/**
+ * Leave the source at `exitSec` and continue from `entrySec`, forwards or backwards.
+ * A loop wrap is the jump from its end back to its start. Homogeneity belongs to
+ * a held loop, not to a jump, so it is left out.
+ */
+export function scoreJump(
+  samples: Float32Array,
+  sampleRate: number,
+  frames: FrameFeatures[],
+  hopSec: number,
+  model: TransitionModel,
+  bpm: number,
+  exitSec: number,
+  entrySec: number,
+  vibeWindowSec: number = DEFAULT_VIBE_WINDOW_SEC
+): JumpScore {
+  const distance = Math.abs(exitSec - entrySec)
+  const windowSec = effectiveVibeWindowSec(distance, vibeWindowSec)
+  const exit = Math.floor(exitSec * sampleRate)
+  const entry = Math.floor(entrySec * sampleRate)
+  const beatN = Math.max(16, Math.floor((60 / Math.max(1, bpm)) * 2 * sampleRate))
+  const bodyRms = 0.5 * (rms(samples, entry, entry + beatN) + rms(samples, exit - beatN, exit))
+  const seamScore = distance < 0.25 ? 0
+    : seamAcross(samples, sampleRate, entry, exit, entry + beatN, exit - beatN, entry + beatN, bodyRms)
+  const vibeScore = vibeAcross(frames, hopSec, entrySec, exitSec, windowSec)
+  const joinScore = scoreJoinContinuity(frames, hopSec, entrySec, exitSec, model)
+  const contextScore = Math.max(0, Math.min(1, 0.55 * vibeScore + 0.35 * joinScore + 0.1 * 0.75))
+  const closureScore = scorePhraseClosure(frames, hopSec, entrySec, exitSec, windowSec) ?? vibeScore
+  return {
+    seamScore,
+    vibeScore,
+    joinScore,
+    closureScore,
+    qualityScore: combineQuality(seamScore, contextScore, 1) * Math.pow(closureScore, 0.7),
   }
 }
 

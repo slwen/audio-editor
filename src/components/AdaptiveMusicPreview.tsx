@@ -12,6 +12,7 @@ import { AdaptiveSongMap, PassageWave } from './AdaptiveSongMap'
 import { FEEL_LABELS, musicTime } from '@/adaptive/labels'
 import { AdaptiveConnectionEditor } from './AdaptiveConnectionEditor'
 import { SimpleZoneWorkflow } from './SimpleZoneWorkflow'
+import { PackSimulator } from './PackSimulator'
 
 export function AdaptiveMusicPreview() {
   const setup = useAdaptiveStore()
@@ -85,6 +86,7 @@ export function AdaptiveMusicPreview() {
       <div><h1>Build an adaptive soundtrack</h1><p>{loop.sourceName}</p></div>
       <button className="btn" onClick={closeAdaptive}>Back to loops</button>
     </div>
+    <PackSimulator />
     <SimpleZoneWorkflow />
     <details className="zone-advanced"><summary>More loop choices, timing and export</summary>
     <div className="music-studio">
@@ -179,7 +181,7 @@ export function AdaptiveMusicPreview() {
         <h2>3. Build and test the route</h2><p>Combat can repeat for an entire fight. Hear each exit back to exploration before the game uses it.</p>
         <section className="route-lab" aria-label="Audition a connection">
           <h3>Combat-first study</h3>
-          <p>Use your longest Good combat bed and the nearest earlier Good exploration bed. Existing passages stay available.</p>
+          <p>Use your longest Good combat loop and the nearest earlier Good exploration loop. Existing passages stay available.</p>
           <button className="btn" disabled={setup.starting} onClick={() => {
             const pair = prepareTwoStateTrial()
             if (!pair) return
@@ -210,7 +212,7 @@ export function AdaptiveMusicPreview() {
         <div className="music-listening" aria-live="polite">
           {audition ? <><Headphones size={18} /><strong>Listening only</strong><span>{audition.mode === 'song' ? 'Original song from' : 'Section at'} {musicTime(audition.slot.candidate.startSec)} · {musicTime(audition.sourceTime)}</span>
             <button className="btn btn--small" onClick={stopAdaptive}>Stop listening</button></>
-            : playing ? <><strong>{FEEL_LABELS[playback.current!]} · {playback.currentSlot?.kind === 'passage' ? 'playing through' : 'loop bed'}</strong>
+            : playing ? <><strong>{FEEL_LABELS[playback.current!]} · {playback.currentSlot?.kind === 'passage' ? 'playing through' : 'repeating section'}</strong>
               <span>Now: {musicTime(playback.currentSlot!.candidate.startSec)}–{musicTime(playback.currentSlot!.candidate.endSec)}</span>
               <span>{playback.nextSlot ? `Next: ${musicTime(playback.nextSlot.candidate.startSec)} · ${playback.automatic ? followsSource(playback.currentSlot!, playback.nextSlot) ? 'song continues' : 'another section' : FEEL_LABELS[playback.requested!]}` : 'Holding this loop'}</span></>
               : <><strong>{setup.starting ? 'Preparing audio…' : 'Game preview stopped'}</strong><span>Listening to a card is separate from testing game changes.</span></>}

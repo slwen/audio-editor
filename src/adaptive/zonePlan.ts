@@ -64,6 +64,17 @@ export function draftZoneLoops(loop: LoopSession, zones: SongZone[]): { slots: M
 export type RouteSuggestion = { from: MusicSlot; to: MusicSlot; exitBar: number; entryBar?: number; score: number }
 export type HoldRoutes = { source: MusicSlot; approved: RouteSuggestion[]; suggested: RouteSuggestion[] }
 
+export function orderedBeds(slots: MusicSlot[]): MusicSlot[] {
+  return slots.filter(slot => slot.kind !== 'passage')
+    .sort((a, b) => a.candidate.startSec - b.candidate.startSec || b.candidate.bars - a.candidate.bars)
+}
+
+export function nextBed(beds: MusicSlot[], currentKey: string): MusicSlot | undefined {
+  if (beds.length < 2) return undefined
+  const index = beds.findIndex(slot => slot.key === currentKey)
+  return index < 0 ? beds[0] : beds[(index + 1) % beds.length]
+}
+
 /** Longest time from a request to the next approved exit, ignoring any configured release. */
 export function longestExitWait(source: MusicSlot, routes: RouteSuggestion[]): number {
   const bars = source.candidate.bars
@@ -72,6 +83,47 @@ export function longestExitWait(source: MusicSlot, routes: RouteSuggestion[]): n
   if (!points.length || bars <= 0) return Infinity
   return Math.max(...points.map((bar, index) =>
     ((points[(index + 1) % points.length] ?? bar) - bar + bars) % bars || bars)) * duration / bars
+}
+
+export type SectionCoverage = { feel: ZoneFeel; slot: MusicSlot; switchPoints: number;
+  longestSwitchWaitSec: number | null; incomingRoutes: number; sameFeelRoutes: number }
+
+/** Summarize approved, directed joins for every section in the focused two-feel workflow. */
+export function assessSectionCoverage(beds: Record<ZoneFeel, MusicSlot[]>, rules: TransitionRules): SectionCoverage[] {
+  const sections = (['exploration', 'combat'] as const).flatMap(feel => beds[feel].map(slot => ({ feel, slot })))
+  return sections.map(({ feel, slot }) => {
+    const otherFeel = feel === 'combat' ? 'exploration' : 'combat'
+    const switchRoutes = beds[otherFeel].flatMap(to => approvedExitPoints(rules[passagePairKey(slot, to)])
+      .map(exit => ({ from: slot, to, exitBar: exit.exitBar, entryBar: exit.entryBar, score: 0 })))
+    return { feel, slot, switchPoints: switchRoutes.length,
+      longestSwitchWaitSec: switchRoutes.length ? longestExitWait(slot, switchRoutes) : null,
+      incomingRoutes: sections.filter(from => from.slot.key !== slot.key
+        && hasApprovedExit(rules[passagePairKey(from.slot, slot)])).length,
+      sameFeelRoutes: beds[feel].filter(to => to.key !== slot.key
+        && hasApprovedExit(rules[passagePairKey(slot, to)])).length }
+  })
+}
+
+/** Sections the approved routing graph can reach from one starting section. */
+export function reachableSections(beds: Record<ZoneFeel, MusicSlot[]>, rules: TransitionRules,
+  start: { feel: ZoneFeel; slot: MusicSlot }): Set<string> {
+  const sections = (['exploration', 'combat'] as const).flatMap(feel => beds[feel].map(slot => ({ feel, slot })))
+  const id = (feel: ZoneFeel, slot: MusicSlot) => JSON.stringify([feel, slot.key])
+  const reached = new Set([id(start.feel, start.slot)])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const from of sections.filter(section => reached.has(id(section.feel, section.slot)))) {
+      for (const to of sections) {
+        const destination = id(to.feel, to.slot)
+        if (reached.has(destination)) continue
+        if (from.slot.key !== to.slot.key && !hasApprovedExit(rules[passagePairKey(from.slot, to.slot)])) continue
+        reached.add(destination)
+        changed = true
+      }
+    }
+  }
+  return reached
 }
 
 /** Keep the everyday preview on one musically nearby pair, preferring pairs already reviewed. */

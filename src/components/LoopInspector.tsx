@@ -133,7 +133,7 @@ export function LoopInspector() {
   const filterSummary = [
     candidateView === 'saved' ? 'Saved listening decisions' : `Q≥${pct(minQuality)}`,
     candidateView === 'saved' ? null : `V≥${pct(minVibe)}`,
-    barFilter === 'all' ? null : barFilter === 'beds' ? '4–16 bar beds' : `${barFilter} bar`,
+    barFilter === 'all' ? null : barFilter === 'beds' ? '4–16 bar loops' : `${barFilter} bar`,
     lengthFilter === 'all' ? null : lengthFilter,
   ]
     .filter(Boolean)
@@ -225,7 +225,7 @@ export function LoopInspector() {
                     className={`btn btn--small btn--segment${barFilter === v ? ' btn--segment-active' : ''}`}
                     onClick={() => setBarFilter(v as LoopBarFilter)}
                   >
-                    {v === 'all' ? 'All' : v === 'beds' ? 'Beds' : v}
+                    {v === 'all' ? 'All' : v === 'beds' ? 'Long loops' : v}
                   </button>
                 ))}
               </div>
