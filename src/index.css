@@ -455,6 +455,10 @@ body {
   margin-bottom: 0.75rem;
 }
 
+.segmented--compact {
+  margin-bottom: 0;
+}
+
 .btn--segment {
   min-width: 2.85rem;
   padding: 0 0.35rem;

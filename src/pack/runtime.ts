@@ -59,6 +59,8 @@ export class PackRuntime {
   private urgent = false
   /** While a lead-in plays, no other decision interrupts it before this combat entrance. */
   private committedUntil: number | null = null
+  /** Level-end / interlude: play the tape forward. No holds or feel jumps. */
+  private through = false
   private readonly points: number[]
   private readonly byExit = new Map<string, PackJump[]>()
   /** Per zone index: the decision point where that zone jumps back to keep its feel. */
@@ -159,11 +161,21 @@ export class PackRuntime {
     this.requestedAt = null
     this.urgent = false
     this.committedUntil = null
+    this.through = false
     return { startSec: this.pos, endSec: this.end }
+  }
+
+  /** Play the song forward with no holds or feel jumps. Used while a level is fading out. */
+  playThrough(): void {
+    this.through = true
+    this.urgent = false
+    this.committedUntil = null
+    this.requestedAt = null
   }
 
   /** `urgent` combat skips musical waiting and cuts to an entrance hit at the next beat. */
   request(feel: PackFeel, urgent = false): void {
+    this.through = false
     if (feel !== this.desired) this.committedUntil = null
     this.desired = feel
     this.urgent = urgent && feel === 'combat'
@@ -210,8 +222,9 @@ export class PackRuntime {
       if (requireP && p < policy.minP) return []
       const recency = this.recencyAfter(jump.entrySec)
       const arrivesAtSection = mode !== 'hold' && jump.entrySec - zone.startSec < 4 * this.beatSec ? 0.05 : 0
+      const cycleBeats = mode === 'hold' ? this.cycleSec(exitSec, jump.entrySec) / this.beatSec : 0
       return [{ jump, p, fadeSec: jump.fadeSec ?? (cut ? policy.cutFadeSec : policy.blendSec),
-        score: p - 0.35 * recency + arrivesAtSection }]
+        score: p - 0.35 * recency + arrivesAtSection + 0.015 * Math.min(cycleBeats, 64) }]
     }).sort((a, b) => b.score - a.score)
   }
 
@@ -244,7 +257,9 @@ export class PackRuntime {
     const playing = this.playingFeel
     const natural = exit < durationSec - EPS ? this.feelAt(exit) : null
     let join: PackJoin | undefined
-    if (this.committedUntil !== null && exit < this.committedUntil - EPS) {
+    if (this.through) {
+      // The song continues in its own order. A wrap at the end is the only join.
+    } else if (this.committedUntil !== null && exit < this.committedUntil - EPS) {
       // A lead-in is playing the song's own build; let it reach the entrance.
     } else if (playing !== want) {
       const waitedSec = this.clock - (this.requestedAt ?? this.clock)
@@ -278,7 +293,9 @@ export class PackRuntime {
       if (hold) join = this.join('hold', hold, playing, want)
     }
     if (!join && natural === null) {
-      const restart = this.pack.zones.find(z => z.feel === want) ?? this.pack.zones[0]!
+      const restart = this.through
+        ? this.pack.zones[0]!
+        : (this.pack.zones.find(z => z.feel === want) ?? this.pack.zones[0]!)
       join = { kind: 'fallback', exitSec: exit, entrySec: restart.startSec, fadeSec: policy.blendSec, p: 0, source: 'song',
         from: playing, to: restart.feel }
     }

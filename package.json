@@ -19,6 +19,7 @@
     "split-stems": "node scripts/run-ts.mjs scripts/split-stems.ts"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "@soundtouchjs/audio-worklet": "^1.0.10",
     "idb": "^8.0.3",
     "lucide-react": "^0.468.0",

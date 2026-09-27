@@ -8,10 +8,43 @@ import {
   clipTimelineEnd,
   getProjectEndTime,
 } from '@/lib/clipMath'
+import { encodeMp3 } from '@/audio/encodeMp3'
 import { writeWavStereo16 } from '@/audio/wavBytes'
 import type { Clip } from '@/types'
 
-export async function exportMixedWav(clips: Clip[], masterLinear: number): Promise<Blob> {
+export type AudioExportFormat = 'mp3' | 'wav'
+
+export function encodeAudioBuffer(rendered: AudioBuffer, format: AudioExportFormat): Blob {
+  switch (format) {
+    case 'wav':
+      return new Blob([writeWavStereo16(rendered)], { type: 'audio/wav' })
+    case 'mp3':
+      return encodeMp3(rendered)
+    default: {
+      const _exhaustive: never = format
+      throw new Error(`Unsupported export format: ${_exhaustive}`)
+    }
+  }
+}
+
+export function audioExportFilename(stem: string, format: AudioExportFormat): string {
+  switch (format) {
+    case 'wav':
+      return `${stem}.wav`
+    case 'mp3':
+      return `${stem}.mp3`
+    default: {
+      const _exhaustive: never = format
+      throw new Error(`Unsupported export format: ${_exhaustive}`)
+    }
+  }
+}
+
+export async function exportMixedWav(
+  clips: Clip[],
+  masterLinear: number,
+  format: AudioExportFormat = 'mp3'
+): Promise<Blob> {
   const duration = getProjectEndTime(clips) + 0.25
   const sampleRate = 48000
   const length = Math.ceil(duration * sampleRate)
@@ -64,15 +97,18 @@ export async function exportMixedWav(clips: Clip[], masterLinear: number): Promi
   }
 
   const rendered = await offline.startRendering()
-  const wav = writeWavStereo16(rendered)
-  return new Blob([wav], { type: 'audio/wav' })
+  return encodeAudioBuffer(rendered, format)
 }
 
 /**
  * Export only selected clips, rebased so the earliest selected start renders at t=0.
  * This avoids leading silence from their original timeline position.
  */
-export async function exportSelectedWav(clips: Clip[], masterLinear: number): Promise<Blob> {
+export async function exportSelectedWav(
+  clips: Clip[],
+  masterLinear: number,
+  format: AudioExportFormat = 'mp3'
+): Promise<Blob> {
   if (clips.length === 0) throw new Error('No clips selected')
 
   const sorted = [...clips].sort((a, b) => a.startTime - b.startTime)
@@ -140,6 +176,5 @@ export async function exportSelectedWav(clips: Clip[], masterLinear: number): Pr
   }
 
   const rendered = await offline.startRendering()
-  const wav = writeWavStereo16(rendered)
-  return new Blob([wav], { type: 'audio/wav' })
+  return encodeAudioBuffer(rendered, format)
 }

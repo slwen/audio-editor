@@ -41,6 +41,23 @@ describe('pack runtime', () => {
     expect(joins.every(j => j.kind === 'hold' && j.entrySec === 0)).toBe(true)
   })
 
+  it('prefers the longer hold when two good holds share an exit', () => {
+    const runtime = new PackRuntime(pack([model(16, 0, 0.9, 0.95), model(16, 8, 0.9, 0.95), model(32, 16, 0.9, 0.95)]))
+    runtime.start('exploration')
+    const joins = joinsOf(playUntil(runtime, 120))
+    expect(joins.length).toBeGreaterThanOrEqual(2)
+    expect(joins.every(j => j.kind === 'hold' && j.entrySec === 0)).toBe(true)
+  })
+
+  it('plays the song forward without holding when playThrough is on', () => {
+    const runtime = new PackRuntime(pack([...holds, ...switches]))
+    runtime.start('exploration')
+    runtime.playThrough()
+    const steps = playUntil(runtime, 40)
+    expect(steps.some(s => (runtime.feelAt(s.startSec) ?? 'exploration') === 'combat')).toBe(true)
+    expect(joinsOf(steps).every(j => j.kind !== 'hold')).toBe(true)
+  })
+
   it('plays a listener-approved hold at its exact off-grid times, before the zone end', () => {
     const approved: PackJump = { exitSec: 10.25, entrySec: 2.25, pCut: 0.95, pBlended: 0.95, source: 'listener', fadeSec: 0.035 }
     const runtime = new PackRuntime(pack([...holds, approved]))

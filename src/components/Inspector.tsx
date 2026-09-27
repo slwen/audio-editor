@@ -1,7 +1,12 @@
 import { CopyPlus, Trash2 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { audioEngine } from '@/audio/AudioEngine'
-import { exportSelectedWav } from '@/audio/exportWav'
+import {
+  audioExportFilename,
+  exportSelectedWav,
+  type AudioExportFormat,
+} from '@/audio/exportWav'
+import { ExportFormatToggle } from '@/components/ExportFormatToggle'
 import { clipTimelineDuration, clipTimelineEnd } from '@/lib/clipMath'
 import { downloadBlob } from '@/lib/downloadBlob'
 import { enterLoopModeFromSelection } from '@/loop/loopModeActions'
@@ -47,6 +52,8 @@ export function Inspector() {
   const deleteSelected = useProjectStore((s) => s.deleteSelected)
   const duplicateSelected = useProjectStore((s) => s.duplicateSelected)
   const isPlaying = useProjectStore((s) => s.isPlaying)
+  const [exportFormat, setExportFormat] = useState<AudioExportFormat>('mp3')
+  const [exporting, setExporting] = useState(false)
 
   const selected = useMemo(
     () => clips.filter((c) => selection.includes(c.id)),
@@ -130,14 +137,19 @@ export function Inspector() {
             <button
               type="button"
               className="btn btn--small"
+              disabled={exporting}
               onClick={() => {
-                void exportSelectedWav(selected, masterGain).then((blob) =>
-                  downloadBlob(blob, `selection-${selected.length}-clips.wav`)
-                )
+                setExporting(true)
+                void exportSelectedWav(selected, masterGain, exportFormat)
+                  .then((blob) =>
+                    downloadBlob(blob, audioExportFilename(`selection-${selected.length}-clips`, exportFormat))
+                  )
+                  .finally(() => setExporting(false))
               }}
             >
-              Export {selected.length} selected
+              {exporting ? 'Exporting…' : `Export ${selected.length} selected`}
             </button>
+            <ExportFormatToggle value={exportFormat} onChange={setExportFormat} />
             {selected.length === 1 && (
               <button
                 type="button"

@@ -236,9 +236,10 @@ export class PackLivePlayer {
   }
 
   /** `startSec` defaults to the first zone of `feel`; pass a zone start to begin elsewhere in the song. */
-  start(feel: PackFeel, startSec?: number): void {
+  start(feel: PackFeel, startSec?: number, opts?: { playThrough?: boolean }): void {
     this.stop()
     const first = this.runtime.start(feel, startSec)
+    if (opts?.playThrough) this.runtime.playThrough()
     const when = this.ctx.currentTime + 0.1
     this.stageTo(feel, when, 0)
     this.onFeel?.(feel, when, 0)
@@ -257,6 +258,12 @@ export class PackLivePlayer {
     }
     this.release = null
     this.runtime.request(feel, urgent)
+  }
+
+  /** Keep playing the song forward: no holds, no feel jumps. Cancels a pending exploration release. */
+  playThrough(): void {
+    this.release = null
+    this.runtime.playThrough()
   }
 
   /** Stop now, or fade every voice out over `fadeSec` first. */

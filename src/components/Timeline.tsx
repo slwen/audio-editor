@@ -1,7 +1,8 @@
 import { CopyPlus, Redo2, Trash2, Undo2 } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getCachedBuffer } from '@/audio/bufferCache'
-import { exportMixedWav } from '@/audio/exportWav'
+import { audioExportFilename, exportMixedWav, type AudioExportFormat } from '@/audio/exportWav'
+import { ExportFormatToggle } from '@/components/ExportFormatToggle'
 import { downloadBlob } from '@/lib/downloadBlob'
 import { ingestAudioFiles } from '@/lib/ingestFiles'
 import {
@@ -82,6 +83,8 @@ function quantizeTimelineStep(t: number): number {
 }
 
 export function Timeline() {
+  const [exportFormat, setExportFormat] = useState<AudioExportFormat>('mp3')
+  const [exporting, setExporting] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasAreaRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -714,15 +717,18 @@ export function Timeline() {
         <button
           type="button"
           className="btn btn--small"
+          disabled={exporting}
           onClick={() => {
             const st = useProjectStore.getState()
-            void exportMixedWav(st.clips, st.masterGain).then((blob) =>
-              downloadBlob(blob, 'mixdown.wav')
-            )
+            setExporting(true)
+            void exportMixedWav(st.clips, st.masterGain, exportFormat)
+              .then((blob) => downloadBlob(blob, audioExportFilename('mixdown', exportFormat)))
+              .finally(() => setExporting(false))
           }}
         >
-          Export WAV
+          {exporting ? 'Exporting…' : 'Export mix'}
         </button>
+        <ExportFormatToggle value={exportFormat} onChange={setExportFormat} />
       </div>
       <div ref={canvasAreaRef} className="timeline-canvas-area">
         <canvas
