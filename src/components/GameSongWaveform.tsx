@@ -55,16 +55,16 @@ export function GameSongWaveform() {
     g.setTransform(dpr, 0, 0, dpr, 0, 0)
     g.clearRect(0, 0, width, HEIGHT)
     const x = (sec: number) => (sec / analysis.durationSec) * width
-    g.fillStyle = readCssColor('--wave-quiet', 'rgba(37,36,44,0.55)')
+    g.fillStyle = readCssColor('--wave-quiet', 'rgba(0,0,0,0.35)')
     for (const bar of analysis.bars) if (bar.quiet) g.fillRect(x(bar.startSec), 0, Math.max(1, x(bar.endSec) - x(bar.startSec)), LANE_HEIGHT * 2)
     drawLane(g, peaks.base, 0, width, readCssColor('--wave-lane-base', '#5fc9e7'))
     drawLane(g, peaks.top, LANE_HEIGHT, width, readCssColor('--wave-lane-top', '#f3a787'))
-    g.strokeStyle = readCssColor('--ui-border-subtle', 'rgba(93,71,118,0.7)')
+    g.strokeStyle = readCssColor('--timeline-grid-strong', 'rgba(255,255,255,0.18)')
     g.beginPath()
     g.moveTo(0, LANE_HEIGHT + 0.5)
     g.lineTo(width, LANE_HEIGHT + 0.5)
     g.stroke()
-    g.fillStyle = readCssColor('--ui-muted', '#85daeb')
+    g.fillStyle = readCssColor('--timeline-ruler-text', '#a0a0a8')
     g.font = '11px system-ui, sans-serif'
     const step = analysis.durationSec > 240 ? 30 : 15
     for (let t = 0; t < analysis.durationSec; t += step) {

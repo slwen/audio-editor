@@ -27,49 +27,55 @@
   --chasm-neon-yellow: #fdfe89;
   --chasm-white: #ffffff;
 
-  /* —— Main UI: darks & neutrals —— */
-  /* Only off-palette value: a darker shade of --chasm-base for canvas/input wells. */
-  --ui-bg-deep: #25242c;
-  --ui-bg: var(--chasm-base);
-  --ui-surface: var(--chasm-base);
-  --ui-elevated: var(--chasm-dusk);
-  --ui-surface-2: var(--chasm-slate);
-  --ui-border: var(--chasm-plum);
-  --ui-border-subtle: rgba(93, 71, 118, 0.7);
-  --ui-muted: var(--chasm-ice);
-  --ui-text: var(--chasm-sand);
-  --ui-text-dim: rgba(245, 218, 167, 0.72);
-  --ui-shadow: rgba(37, 36, 44, 0.7);
+  /* —— UI chrome: neutral greys only (no palette hues) —— */
+  --ui-bg-deep: #141416;
+  --ui-bg: #1a1a1c;
+  --ui-surface: #222225;
+  --ui-elevated: #2a2a2e;
+  --ui-surface-2: #323236;
+  --ui-control-hover: #3c3c41;
+  --ui-input: #18181a;
+  --ui-border: #47474d;
+  --ui-border-subtle: #333338;
+  --ui-border-strong: #5c5c63;
+  --ui-muted: #a0a0a8;
+  --ui-text: #ececee;
+  --ui-text-dim: #c4c4ca;
+  --ui-text-disabled: #6b6b73;
+  --ui-shadow: rgba(0, 0, 0, 0.5);
 
-  /* —— Semantic status colors —— */
-  --success: var(--chasm-mint);
-  --success-strong: var(--chasm-green);
-  --warning: var(--chasm-neon-yellow);
-  --warning-soft: var(--chasm-peach);
-  --danger: var(--chasm-neon-pink);
-  --danger-dim: var(--chasm-magenta);
+  /* Status stays neutral; meaning comes from icons and weight. */
+  --success: var(--ui-text);
+  --warning: var(--ui-text-dim);
+  --danger: var(--ui-text);
 
-  /* Primary UI accent (buttons, focus) */
-  --accent: var(--chasm-sky);
-  --accent-dim: var(--chasm-azure);
-  --accent-glow: rgba(95, 201, 231, 0.35);
-  --on-accent: var(--ui-bg-deep);
+  /* Primary / toggled / focus: distinguished by lightness, not hue */
+  --accent: #ececee;
+  --accent-hover: #ffffff;
+  --accent-glow: rgba(255, 255, 255, 0.22);
+  --on-accent: #1a1a1c;
+  --focus-ring: rgba(255, 255, 255, 0.85);
+
+  /* —— Timeline / waveform content: Chasm palette allowed here only —— */
   --playhead: var(--chasm-neon-pink);
   --selection-ring: var(--chasm-neon-cyan);
+  --marker-start: var(--chasm-mint);
+  --marker-end: var(--chasm-neon-pink);
+  --marker-text: #1a1a1c;
 
   /* Game song waveform lanes */
   --wave-lane-base: var(--chasm-sky);
   --wave-lane-top: var(--chasm-peach);
-  --wave-quiet: rgba(37, 36, 44, 0.55);
+  --wave-quiet: rgba(0, 0, 0, 0.35);
 
-  /* Timeline canvas (read from JS) */
+  /* Timeline canvas (read from JS); background, grid and ruler stay neutral */
   --timeline-canvas-bg: var(--ui-bg-deep);
-  --timeline-ruler-bg: var(--chasm-dusk);
-  --timeline-grid: rgba(93, 71, 118, 0.55);
-  --timeline-grid-strong: var(--chasm-plum);
+  --timeline-ruler-bg: var(--ui-surface);
+  --timeline-grid: rgba(255, 255, 255, 0.07);
+  --timeline-grid-strong: rgba(255, 255, 255, 0.18);
   --timeline-ruler-text: var(--ui-muted);
   --timeline-playhead: var(--playhead);
-  --timeline-wave: var(--accent);
+  --timeline-wave: var(--chasm-sky);
   --timeline-marquee-fill: rgba(95, 201, 231, 0.1);
   --timeline-marquee-stroke: rgba(94, 253, 247, 0.5);
 
@@ -82,7 +88,7 @@
 
   color: var(--text);
   background: var(--bg);
-  accent-color: var(--accent);
+  accent-color: #d4d4d8;
 }
 
 * {
@@ -338,16 +344,16 @@ body {
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   color: var(--ui-text);
-  background: var(--ui-bg-deep);
+  background: var(--ui-input);
   border: 1px solid var(--ui-border);
   border-radius: 6px;
 }
 
 .inspector input[type='number']:focus-visible,
 .inspector input[type='text']:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
-  border-color: var(--accent);
+  border-color: var(--ui-border-strong);
 }
 
 .inspector input[type='range'] {
@@ -427,8 +433,13 @@ body {
 }
 
 .btn:hover {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--ui-surface-2) 85%, var(--accent) 15%);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control-hover);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
 }
 
 .btn--primary {
@@ -439,8 +450,8 @@ body {
 }
 
 .btn--primary:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 0 0 1px var(--accent-glow);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .btn--small {
@@ -519,8 +530,8 @@ body {
 
 .loop-mode-badge--on {
   color: var(--on-accent);
-  background: var(--selection-ring);
-  border-color: var(--selection-ring);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .loop-candidate-list {
@@ -556,8 +567,8 @@ body {
 }
 
 .btn--flyout[aria-expanded='true'] {
-  background: color-mix(in srgb, var(--ui-elevated) 70%, var(--accent) 30%);
-  border-color: var(--accent);
+  background: var(--ui-control-hover);
+  border-color: var(--ui-border-strong);
 }
 
 .loop-candidate {
@@ -603,9 +614,9 @@ body {
 }
 
 .loop-rate--bad[aria-pressed='true'] {
-  background: var(--danger-dim);
-  border-color: var(--danger-dim);
-  color: var(--on-accent);
+  background: var(--ui-border-strong);
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
 }
 
 .loop-candidate__title {
@@ -630,16 +641,16 @@ body {
 .loop-candidate__bar > span {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--ui-muted);
 }
 
 .loop-candidate--selected {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--ui-surface) 82%, var(--accent) 18%);
+  border-color: var(--ui-text-dim);
+  background: var(--ui-elevated);
 }
 
 .loop-candidate--preview {
-  box-shadow: 0 0 0 1px var(--selection-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
 .field--check {
@@ -654,7 +665,7 @@ body {
 
 .loop-toolbar { padding: 12px 16px; border-bottom: 1px solid var(--ui-border); }
 .loop-toolbar .field { flex: 1; margin-bottom: 0; }
-.loop-toolbar select { max-width: 150px; padding: 5px; color: inherit; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 5px; }
+.loop-toolbar select { max-width: 150px; padding: 5px; color: inherit; background: var(--ui-input); border: 1px solid var(--ui-border); border-radius: 5px; }
 .loop-feels { display: flex; flex-wrap: wrap; gap: 4px; }
 .loop-feels .btn { font-size: 10px; padding: 3px 6px; text-transform: capitalize; }
 .loop-feels .btn[aria-pressed='true'] { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
@@ -680,8 +691,8 @@ body {
 .gs-error { color: var(--danger); font-size: 13px; white-space: pre-wrap; }
 .gs-ok { display: flex; align-items: center; gap: 6px; color: var(--success); }
 .gs-current { font-size: 14px; }
-.gs-start { color: var(--success); }
-.gs-end { color: var(--danger); }
+.gs-start { color: var(--marker-start); }
+.gs-end { color: var(--marker-end); }
 .gs-stepper { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 16px 0 20px; }
 .gs-stepper__item { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border: 1px solid var(--ui-border-subtle); border-radius: 999px; font-size: 13px; }
 .gs-stepper__item--current { border-color: var(--accent); }
@@ -693,37 +704,37 @@ body {
 .gs-step__number { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border-radius: 50%; background: var(--ui-surface); color: var(--ui-text); font-size: 13px; font-weight: 700; }
 .gs-step__number--small { flex-basis: 22px; height: 22px; font-size: 11px; }
 .gs-step__number--current { background: var(--accent); color: var(--on-accent); }
-.gs-step__number--done { background: var(--success); color: var(--on-accent); }
+.gs-step__number--done { background: var(--ui-surface-2); color: var(--ui-text); box-shadow: inset 0 0 0 1px var(--ui-border); }
 .gs-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 10px 0; }
 .gs-inline { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ui-muted); }
 .gs-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .gs-progress { display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
 .gs-progress progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .gs-progress span { font-size: 13px; color: var(--ui-muted); }
-.gs-install { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--warning); border-radius: 6px; }
+.gs-install { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--ui-border-strong); border-radius: 6px; }
 .gs-install p { flex-basis: 100%; margin: 0; }
-.gs code { font-size: 12px; background: var(--ui-bg-deep); padding: 3px 6px; border-radius: 4px; word-break: break-all; }
+.gs code { font-size: 12px; background: var(--ui-input); padding: 3px 6px; border-radius: 4px; word-break: break-all; }
 .gs-wave { position: relative; margin: 12px 0 6px; background: var(--ui-bg-deep); border-radius: 6px; cursor: pointer; user-select: none; touch-action: none; }
 .gs-wave canvas { display: block; }
 .gs-wave__lane-label { position: absolute; left: 6px; font-size: 11px; color: var(--ui-text-dim); pointer-events: none; }
 .gs-wave__intro { position: absolute; left: 0; bottom: 20px; font-size: 11px; color: var(--ui-muted); text-align: center; pointer-events: none; border-top: 1px dashed var(--ui-muted); }
-.gs-wave__loop { position: absolute; top: 0; bottom: 18px; background: color-mix(in srgb, var(--success) 14%, transparent); pointer-events: none; }
+.gs-wave__loop { position: absolute; top: 0; bottom: 18px; background: color-mix(in srgb, var(--marker-start) 12%, transparent); pointer-events: none; }
 .gs-wave__marker { position: absolute; top: -4px; bottom: 14px; width: 14px; margin-left: -7px; cursor: ew-resize; z-index: 2; }
 .gs-wave__marker::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 2px; background: currentColor; }
 .gs-wave__marker span { position: absolute; top: 2px; white-space: nowrap; font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: currentColor; }
-.gs-wave__marker--start { color: var(--success); }
+.gs-wave__marker--start { color: var(--marker-start); }
 .gs-wave__marker--start span { left: 9px; }
-.gs-wave__marker--end { color: var(--danger); }
+.gs-wave__marker--end { color: var(--marker-end); }
 .gs-wave__marker--end span { right: 9px; }
-.gs-wave__marker span { color: var(--on-accent); }
-.gs-wave__marker--start span { background: var(--success); }
-.gs-wave__marker--end span { background: var(--danger); }
+.gs-wave__marker span { color: var(--marker-text); }
+.gs-wave__marker--start span { background: var(--marker-start); }
+.gs-wave__marker--end span { background: var(--marker-end); }
 .gs-wave__playhead { position: absolute; top: 0; bottom: 18px; width: 2px; margin-left: -1px; background: var(--ui-text); pointer-events: none; z-index: 1; }
 .gs-markers { gap: 12px 24px; }
 .gs-marker-field { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .gs-marker-field strong { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; font-size: 15px; }
 .gs-verdict { padding: 8px 0; }
-.gs-warnings { list-style: none; padding: 10px 12px; margin: 10px 0; border: 1px solid var(--warning); border-radius: 6px; font-size: 13px; }
+.gs-warnings { list-style: none; padding: 10px 12px; margin: 10px 0; border: 1px solid var(--ui-border-strong); border-radius: 6px; font-size: 13px; }
 .gs-warnings li { display: flex; align-items: flex-start; gap: 8px; margin: 3px 0; color: var(--warning); }
 .gs-suggestions { margin-top: 14px; border-top: 1px solid var(--ui-border-subtle); padding-top: 6px; }
 .gs-suggestions ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
@@ -731,13 +742,14 @@ body {
 .gs-suggestion:hover { border-color: var(--ui-border); }
 .gs-suggestion--active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .gs-suggestion__rank { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ui-surface); font-size: 11px; }
-.gs-tag { font-size: 11px; padding: 1px 6px; border-radius: 3px; background: color-mix(in srgb, var(--success) 30%, transparent); }
+.gs-tag { font-size: 11px; padding: 1px 6px; border-radius: 3px; background: var(--ui-control-hover); color: var(--ui-text-dim); }
 .gs-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; max-width: 820px; }
 .gs-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ui-muted); }
 .gs-form__wide { grid-column: 1 / -1; }
-.gs select { font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--ui-border); background: var(--ui-bg-deep); color: var(--ui-text); }
-.gs-form input { font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--ui-border); background: var(--ui-bg-deep); color: var(--ui-text); }
-.gs-done { margin-top: 12px; padding: 14px 16px; border: 1px solid var(--success); border-radius: 7px; background: color-mix(in srgb, var(--ui-elevated) 88%, var(--success) 12%); }
+.gs select { font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--ui-border); background: var(--ui-input); color: var(--ui-text); }
+.gs-form input { font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--ui-border); background: var(--ui-input); color: var(--ui-text); }
+.gs select:focus-visible, .gs-form input:focus-visible, .loop-toolbar select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.gs-done { margin-top: 12px; padding: 14px 16px; border: 1px solid var(--ui-border-strong); border-radius: 7px; background: var(--ui-surface-2); }
 .gs-done ul { margin: 4px 0 10px; padding-left: 18px; font-size: 13px; }
 .gs-next { display: flex; align-items: center; gap: 8px; }
 .gs-next code { font-size: 14px; }

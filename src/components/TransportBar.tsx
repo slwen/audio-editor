@@ -84,7 +84,7 @@ export function TransportBar() {
         >
           Find loops
         </button>
-        <button type="button" className="btn btn--small btn--primary" onClick={() => enterGameSongMode()}>
+        <button type="button" className="btn btn--small" onClick={() => enterGameSongMode()}>
           Game song
         </button>
       </>)}

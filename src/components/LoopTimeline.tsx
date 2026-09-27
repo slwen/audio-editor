@@ -97,11 +97,11 @@ export function LoopTimeline() {
 
     const css = (name: string, fb: string) => readCssColor(name, fb)
     const accent = css('--timeline-wave', '#5fc9e7')
-    const grid = css('--timeline-grid', 'rgba(93,71,118,0.55)')
-    ctx.fillStyle = css('--timeline-canvas-bg', '#25242c')
+    const grid = css('--timeline-grid', 'rgba(255,255,255,0.07)')
+    ctx.fillStyle = css('--timeline-canvas-bg', '#141416')
     ctx.fillRect(0, 0, w, h)
 
-    ctx.fillStyle = css('--timeline-ruler-bg', '#463c5e')
+    ctx.fillStyle = css('--timeline-ruler-bg', '#222225')
     ctx.fillRect(0, 0, w, RULER_H)
     ctx.strokeStyle = grid
     ctx.beginPath()
@@ -109,7 +109,7 @@ export function LoopTimeline() {
     ctx.lineTo(w, RULER_H)
     ctx.stroke()
 
-    ctx.fillStyle = css('--timeline-ruler-text', '#85daeb')
+    ctx.fillStyle = css('--timeline-ruler-text', '#a0a0a8')
     ctx.font = '11px system-ui, sans-serif'
     const t0 = xt(0)
     const t1 = xt(w)
@@ -122,7 +122,7 @@ export function LoopTimeline() {
         const x = tx(t)
         const barI = Math.round((t - beatOffsetSec) / bar)
         const isBar = Math.abs((t - beatOffsetSec) / bar - barI) < 1e-3
-        ctx.strokeStyle = isBar ? css('--timeline-grid-strong', '#5d4776') : grid
+        ctx.strokeStyle = isBar ? css('--timeline-grid-strong', 'rgba(255,255,255,0.18)') : grid
         ctx.beginPath()
         ctx.moveTo(x, isBar ? 4 : 14)
         ctx.lineTo(x, RULER_H)
@@ -170,7 +170,7 @@ export function LoopTimeline() {
 
     const selected = new Set(selectedIds)
     const ring = css('--selection-ring', '#5efdf7')
-    const muted = css('--ui-muted', '#85daeb')
+    const muted = css('--ui-muted', '#a0a0a8')
     const ranked = [...visible].sort((a, b) => a.startSec - b.startSec)
     ranked.forEach((c, i) => {
       const cx0 = tx(c.startSec)

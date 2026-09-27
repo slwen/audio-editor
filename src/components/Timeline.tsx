@@ -195,16 +195,16 @@ export function Timeline() {
 
     const css = (name: string, fb: string) => readCssColor(name, fb)
 
-    ctx.fillStyle = css('--timeline-canvas-bg', '#25242c')
+    ctx.fillStyle = css('--timeline-canvas-bg', '#141416')
     ctx.fillRect(0, 0, w, h)
 
-    ctx.strokeStyle = css('--timeline-grid', 'rgba(93,71,118,0.55)')
+    ctx.strokeStyle = css('--timeline-grid', 'rgba(255,255,255,0.07)')
     ctx.lineWidth = 1
     const t0 = xt(0)
     const t1 = xt(w)
     const sec0 = Math.floor(Math.min(t0, t1))
     const sec1 = Math.ceil(Math.max(t0, t1))
-    ctx.fillStyle = css('--timeline-ruler-text', '#85daeb')
+    ctx.fillStyle = css('--timeline-ruler-text', '#a0a0a8')
     ctx.font = '11px system-ui, sans-serif'
     for (let s = sec0; s <= sec1; s++) {
       const x = tx(s)
@@ -265,7 +265,7 @@ export function Timeline() {
         ctx.stroke()
       }
 
-      ctx.fillStyle = css('--ui-text', '#f5daa7')
+      ctx.fillStyle = css('--ui-text', '#ececee')
       ctx.font = '12px system-ui, sans-serif'
       ctx.fillText(c.label ?? nameByBuffer.get(c.bufferId) ?? 'clip', x0 + 8, y0 + 18)
     }
