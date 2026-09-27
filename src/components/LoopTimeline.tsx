@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getCachedBuffer } from '@/audio/bufferCache'
 import { getPeaks } from '@/lib/peaksCache'
-import { parseHexRgb, readCssColor } from '@/lib/themeCanvas'
+import { readCssColor, withAlpha } from '@/lib/themeCanvas'
 import { TIMELINE_PAD_L, TIMELINE_PAD_R } from '@/lib/timelineScroll'
+import { TRACK_ACCENT_HEXES } from '@/lib/trackAccent'
 import { filterLoopCandidates } from '@/loop/filters'
 import { exitLoopMode, rerunLoopAnalysis, selectLoopCandidate } from '@/loop/loopModeActions'
 import { useLoopStore } from '@/store/useLoopStore'
@@ -95,18 +96,20 @@ export function LoopTimeline() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     const css = (name: string, fb: string) => readCssColor(name, fb)
-    ctx.fillStyle = css('--timeline-canvas-bg', '#1a1c2c')
+    const accent = css('--timeline-wave', '#5fc9e7')
+    const grid = css('--timeline-grid', 'rgba(93,71,118,0.55)')
+    ctx.fillStyle = css('--timeline-canvas-bg', '#25242c')
     ctx.fillRect(0, 0, w, h)
 
-    ctx.fillStyle = css('--ui-elevated', '#2a3148')
+    ctx.fillStyle = css('--timeline-ruler-bg', '#463c5e')
     ctx.fillRect(0, 0, w, RULER_H)
-    ctx.strokeStyle = css('--timeline-grid', 'rgba(86,108,134,0.35)')
+    ctx.strokeStyle = grid
     ctx.beginPath()
     ctx.moveTo(0, RULER_H)
     ctx.lineTo(w, RULER_H)
     ctx.stroke()
 
-    ctx.fillStyle = css('--timeline-ruler-text', '#94b0c2')
+    ctx.fillStyle = css('--timeline-ruler-text', '#85daeb')
     ctx.font = '11px system-ui, sans-serif'
     const t0 = xt(0)
     const t1 = xt(w)
@@ -119,7 +122,7 @@ export function LoopTimeline() {
         const x = tx(t)
         const barI = Math.round((t - beatOffsetSec) / bar)
         const isBar = Math.abs((t - beatOffsetSec) / bar - barI) < 1e-3
-        ctx.strokeStyle = isBar ? css('--ui-border', '#566c86') : css('--timeline-grid', 'rgba(86,108,134,0.35)')
+        ctx.strokeStyle = isBar ? css('--timeline-grid-strong', '#5d4776') : grid
         ctx.beginPath()
         ctx.moveTo(x, isBar ? 4 : 14)
         ctx.lineTo(x, RULER_H)
@@ -139,15 +142,14 @@ export function LoopTimeline() {
     const ch = Math.min(WAVE_H, h - RULER_H - 32)
     const x0 = tx(trimStart)
     const x1 = tx(trimEnd)
-    ctx.fillStyle = 'rgba(65,166,246,0.06)'
+    ctx.fillStyle = withAlpha(accent, 0.06)
     ctx.fillRect(x0, y0, Math.max(1, x1 - x0), ch)
 
     const buf = getCachedBuffer(bufferId)
     const peaks = getPeaks(bufferId)
     if (buf && peaks && peaks.length >= 2) {
       const buckets = peaks.length / 2
-      const { r, g, b } = parseHexRgb('#41a6f6')
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.88)`
+      ctx.strokeStyle = withAlpha(accent, 0.88)
       ctx.lineWidth = 1
       ctx.beginPath()
       const mid = y0 + ch / 2
@@ -167,15 +169,17 @@ export function LoopTimeline() {
     }
 
     const selected = new Set(selectedIds)
+    const ring = css('--selection-ring', '#5efdf7')
+    const muted = css('--ui-muted', '#85daeb')
     const ranked = [...visible].sort((a, b) => a.startSec - b.startSec)
     ranked.forEach((c, i) => {
       const cx0 = tx(c.startSec)
       const cx1 = tx(c.endSec)
       const isSel = selected.has(c.id)
       const isPrev = c.id === previewId
-      const hue = 200 - i * 8
-      ctx.fillStyle = isSel ? `hsla(${hue},70%,55%,0.22)` : `hsla(${hue},50%,50%,0.1)`
-      ctx.strokeStyle = isPrev ? 'rgba(115,239,247,0.95)' : isSel ? 'rgba(65,166,246,0.85)' : 'rgba(148,176,194,0.35)'
+      const tint = TRACK_ACCENT_HEXES[i % TRACK_ACCENT_HEXES.length]!
+      ctx.fillStyle = withAlpha(tint, isSel ? 0.22 : 0.1)
+      ctx.strokeStyle = isPrev ? withAlpha(ring, 0.95) : isSel ? withAlpha(accent, 0.85) : withAlpha(muted, 0.35)
       ctx.lineWidth = isPrev ? 2 : 1
       ctx.beginPath()
       ctx.roundRect(cx0, y0, Math.max(2, cx1 - cx0), ch, 4)
@@ -184,14 +188,14 @@ export function LoopTimeline() {
     })
 
     const phx = tx(playhead)
-    ctx.strokeStyle = css('--timeline-playhead', '#ef7d57')
+    ctx.strokeStyle = css('--timeline-playhead', '#ff5dcc')
     ctx.lineWidth = 2
     ctx.beginPath()
     ctx.moveTo(phx, 0)
     ctx.lineTo(phx, h)
     ctx.stroke()
 
-    ctx.fillStyle = css('--ui-muted', '#94b0c2')
+    ctx.fillStyle = muted
     ctx.font = '12px system-ui, sans-serif'
     const label =
       status === 'analyzing'

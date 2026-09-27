@@ -17,7 +17,3 @@ export function removeCachedBuffer(id: BufferId): void {
 export function clearBufferCache(): void {
   buffers.clear()
 }
-
-export function allCachedBufferIds(): BufferId[] {
-  return [...buffers.keys()]
-}

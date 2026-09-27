@@ -1,10 +1,10 @@
 import { loopRatingKey } from '@/loop/loopRatings'
 import type { LoopBarFilter, LoopCandidate, LoopLengthFilter, LoopFeel, LoopReviewFilter } from '@/loop/types'
 
-export const LENGTH_SHORT_MAX = 8
-export const LENGTH_LONG_MIN = 16
+const LENGTH_SHORT_MAX = 8
+const LENGTH_LONG_MIN = 16
 
-export function loopDuration(c: { startSec: number; endSec: number }): number {
+function loopDuration(c: { startSec: number; endSec: number }): number {
   return c.endSec - c.startSec
 }
 

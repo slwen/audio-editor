@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Pause, Play, SkipBack } from 'lucide-react'
-import { closeAdaptive, openAdaptive } from '@/adaptive/actions'
-import { useAdaptiveStore } from '@/adaptive/store'
+import { enterGameSongMode, exitGameSongMode } from '@/gameSong/actions'
+import { useGameSongStore } from '@/gameSong/store'
 import { getProjectEndTime } from '@/lib/clipMath'
 import { ingestAudioFiles } from '@/lib/ingestFiles'
 import { enterLoopModeFromSelection, exitLoopMode } from '@/loop/loopModeActions'
@@ -11,9 +11,9 @@ import { useProjectStore } from '@/store/useProjectStore'
 
 export function TransportBar() {
   const fileInput = useRef<HTMLInputElement>(null)
-  const adaptiveOpen = useAdaptiveStore(s => s.open)
-  const adaptiveCurrent = useAdaptiveStore(s => s.playback.current)
-  const audition = useAdaptiveStore(s => s.audition)
+  const gameSongPlaying = useGameSongStore(s => s.playing)
+  const gameSongPlayhead = useGameSongStore(s => s.playhead)
+  const gameSongDuration = useGameSongStore(s => s.analysis?.durationSec ?? 0)
   const playhead = useProjectStore((s) => s.playhead)
   const isPlaying = useProjectStore((s) => s.isPlaying)
   const clips = useProjectStore((s) => s.clips)
@@ -31,6 +31,8 @@ export function TransportBar() {
   }
 
   const looping = editorMode === 'loop'
+  const gameSong = editorMode === 'game-song'
+  const playing = gameSong ? gameSongPlaying : isPlaying
   const cand = candidates.find((c) => c.id === previewId)
   const end = looping ? (cand?.endSec ?? trimEnd) : getProjectEndTime(clips)
   const canFindLoops = !looping && selection.length === 1
@@ -39,7 +41,7 @@ export function TransportBar() {
     <header className="transport">
       <div className="transport__brand">Audio edit</div>
       <span className={`loop-mode-badge${looping ? ' loop-mode-badge--on' : ''}`}>
-        {adaptiveOpen && looping ? 'Adaptive' : looping ? 'Loop' : 'Edit'}
+        {gameSong ? 'Game song' : looping ? 'Loop' : 'Edit'}
       </span>
       <div className="transport__controls">
         <button
@@ -54,13 +56,17 @@ export function TransportBar() {
           type="button"
           className="btn btn--icon btn--primary"
           onClick={() => void togglePlayback()}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
+          aria-label={playing ? 'Pause' : 'Play'}
         >
-          {isPlaying ? <Pause size={22} fill="currentColor" strokeWidth={2} /> : <Play size={22} fill="currentColor" strokeWidth={2} />}
+          {playing ? <Pause size={22} fill="currentColor" strokeWidth={2} /> : <Play size={22} fill="currentColor" strokeWidth={2} />}
         </button>
       </div>
-      {looping ? (
-        <button type="button" className="btn btn--small" onClick={() => { closeAdaptive(); exitLoopMode() }}>
+      {gameSong ? (
+        <button type="button" className="btn btn--small" onClick={() => exitGameSongMode()}>
+          Back to editor
+        </button>
+      ) : looping ? (
+        <button type="button" className="btn btn--small" onClick={() => exitLoopMode()}>
           Exit loop
         </button>
       ) : (<>
@@ -78,10 +84,14 @@ export function TransportBar() {
         >
           Find loops
         </button>
+        <button type="button" className="btn btn--small btn--primary" onClick={() => enterGameSongMode()}>
+          Game song
+        </button>
       </>)}
-      {looping && <button className="btn btn--small" disabled={!candidates.length}
-        onClick={() => adaptiveOpen ? closeAdaptive() : openAdaptive()}>{adaptiveOpen ? 'Loop editor' : 'Adaptive preview'}</button>}
-      {adaptiveOpen && looping ? <div className="transport__time">{audition ? `Listening · ${fmt(audition.sourceTime)}` : adaptiveCurrent ?? 'Adaptive preview stopped'}</div> : <div className="transport__time" aria-live="polite">
+      {gameSong ? <div className="transport__time">
+        <span>{fmt(gameSongPlayhead)}</span>
+        <span className="transport__muted"> / {fmt(gameSongDuration)}</span>
+      </div> : <div className="transport__time" aria-live="polite">
         <span>{fmt(playhead)}</span>
         <span className="transport__muted"> / {fmt(end)}</span>
         {looping && bpm != null && (

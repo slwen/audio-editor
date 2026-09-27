@@ -1,8 +1,8 @@
 import type { Clip } from '@/types'
 
-export const CLIP_SPEED_MIN = 0.2
-export const CLIP_SPEED_MAX = 3
-export const CLIP_LINEAR_GAIN_MAX = 4
+const CLIP_SPEED_MIN = 0.2
+const CLIP_SPEED_MAX = 3
+const CLIP_LINEAR_GAIN_MAX = 4
 
 export function clampPlaybackSpeed(s: number): number {
   return Math.max(CLIP_SPEED_MIN, Math.min(CLIP_SPEED_MAX, s))

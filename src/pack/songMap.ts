@@ -1,16 +1,16 @@
 import { estimateBeatOffsetSec, type FrameFeatures } from '@/loop/detectLoops'
-import { jumpContext, jumpFeatures, withFade } from './jumpFeatures'
+import { jumpContext, jumpFeatures, withFade, type JumpContext } from './jumpFeatures'
 import { predictGood, type JumpModel } from './jumpModel'
 import { TRAINED_JUMP_MODEL } from './trainedJumpModel'
 
-export const SONG_MAP_VERSION = 'song-map-v2'
+const SONG_MAP_VERSION = 'song-map-v2'
 /** Probabilities are reported for a click-repair cut and for a one-bar-class blend. */
 const CUT_FADE_SEC = 0.035
 const BLEND_FADE_SEC = 1
 export const BEATS_PER_BAR = 4
 const DEFAULT_JUMPS_PER_EXIT = 8
 
-export type SongBar = {
+type SongBar = {
   index: number
   /** Index into `beatsSec` of this bar's first beat. */
   startBeat: number
@@ -28,7 +28,7 @@ export type SongBar = {
  * Leave at the start of beat `exitBeat` (after hearing beat exitBeat - 1) and continue at the start of `entryBeat`.
  * The two are always a whole number of bars apart, so the meter continues whichever beat is really the downbeat.
  */
-export type SongJump = {
+type SongJump = {
   exitBeat: number
   entryBeat: number
   /** Calibrated P(listener rates it Good) when joined with a short click-repair crossfade. */
@@ -85,7 +85,7 @@ function meanChroma(frames: FrameFeatures[], hopSec: number, startSec: number, e
 }
 
 /** Harmony tends to change and onsets tend to land on bar lines. Picks one of the four beat phases. */
-export function estimateDownbeat(frames: FrameFeatures[], hopSec: number, beatsSec: number[]):
+function estimateDownbeat(frames: FrameFeatures[], hopSec: number, beatsSec: number[]):
   { beat: number; confidence: number } {
   const beatSec = (beatsSec[1] ?? 0) - (beatsSec[0] ?? 0)
   const chromas = beatsSec.map(t => meanChroma(frames, hopSec, t, t + beatSec))
@@ -124,10 +124,14 @@ function barFeatures(frames: FrameFeatures[], hopSec: number, startSec: number, 
   }
 }
 
-export function analyzeSongMap(input: SongMapInput): SongMap {
-  const { samples, sampleRate } = input
-  const durationSec = samples.length / sampleRate
-  const ctx = jumpContext(samples, sampleRate, input.bpmOverride)
+export type SongGrid = {
+  beatsSec: number[]
+  downbeat: { beat: number; confidence: number }
+  bars: SongBar[]
+}
+
+/** One global-tempo beat grid, its heuristic downbeat and per-bar features. */
+export function songGrid(ctx: JumpContext, durationSec: number): SongGrid {
   const { flux, frames, hopSec, bpm } = ctx
   const beatSec = 60 / bpm
   const beatsSec: number[] = []
@@ -139,6 +143,15 @@ export function analyzeSongMap(input: SongMapInput): SongMap {
     const endSec = beatsSec[startBeat + BEATS_PER_BAR]!
     bars.push({ index: bars.length, startBeat, startSec, endSec, ...barFeatures(frames, hopSec, startSec, endSec) })
   }
+  return { beatsSec, downbeat, bars }
+}
+
+export function analyzeSongMap(input: SongMapInput): SongMap {
+  const { samples, sampleRate } = input
+  const durationSec = samples.length / sampleRate
+  const ctx = jumpContext(samples, sampleRate, input.bpmOverride)
+  const { bpm } = ctx
+  const { beatsSec, downbeat, bars } = songGrid(ctx, durationSec)
 
   const jumpModel = input.jumpModel ?? TRAINED_JUMP_MODEL
   const perExit = input.jumpsPerExit ?? DEFAULT_JUMPS_PER_EXIT

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { extractMonoForAnalysis } from '@/loop/detectLoops'
 
-export const SOURCE_SAMPLE_RATE = Number(process.env.LOOP_SOURCE_SAMPLE_RATE ?? 48000)
+const SOURCE_SAMPLE_RATE = Number(process.env.LOOP_SOURCE_SAMPLE_RATE ?? 48000)
 
 /** Same preparation as the browser: stereo decode, downmix, and analysis-rate decimation. Requires ffmpeg. */
 export function decodeForAnalysis(file: string): { samples: Float32Array; sampleRate: number } {
@@ -12,7 +12,7 @@ export function decodeForAnalysis(file: string): { samples: Float32Array; sample
 }
 
 /** Full-rate stereo, for rendering. */
-export function decodeStereo(file: string): { channels: Float32Array[]; sampleRate: number } {
+function decodeStereo(file: string): { channels: Float32Array[]; sampleRate: number } {
   const cache = path.join(os.tmpdir(), 'audio-editor-decode')
   fs.mkdirSync(cache, { recursive: true })
   const out = path.join(cache, `${path.basename(file).replace(/\.[^.]+$/, '')}.${SOURCE_SAMPLE_RATE}.stereo.f32`)

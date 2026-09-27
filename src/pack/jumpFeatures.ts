@@ -9,7 +9,7 @@ import {
 import { DEFAULT_VIBE_WINDOW_SEC } from '@/loop/types'
 
 /** Listening shows a crossfade this long hides splices that fail as a cut. */
-export const BLEND_MIN_SEC = 0.3
+const BLEND_MIN_SEC = 0.3
 
 /** Everything needed to score any jump in one song. Build once per song. */
 export type JumpContext = {

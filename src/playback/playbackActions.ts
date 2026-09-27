@@ -1,6 +1,5 @@
 import { audioEngine } from '@/audio/AudioEngine'
-import { auditionPassage, startAdaptive, stopAdaptive } from '@/adaptive/actions'
-import { useAdaptiveStore } from '@/adaptive/store'
+import { seekGameSong, toggleGameSongPlayback } from '@/gameSong/actions'
 import { joinPreviewOffset } from '@/loop/detectLoops'
 import { startLoopPreview, stopLoopPreview } from '@/loop/loopModeActions'
 import { useLoopStore } from '@/store/useLoopStore'
@@ -35,9 +34,8 @@ export async function seekToTimelineTime(t: number): Promise<void> {
 }
 
 export async function togglePlayback(): Promise<void> {
-  if (useAdaptiveStore.getState().open && useProjectStore.getState().editorMode === 'loop') {
-    if (useAdaptiveStore.getState().playback.current || useAdaptiveStore.getState().starting || useAdaptiveStore.getState().audition) stopAdaptive()
-    else await startAdaptive()
+  if (useProjectStore.getState().editorMode === 'game-song') {
+    await toggleGameSongPlayback()
     return
   }
   const st = useProjectStore.getState()
@@ -63,11 +61,8 @@ export async function togglePlayback(): Promise<void> {
 }
 
 export function skipToStart(): void {
-  if (useAdaptiveStore.getState().open && useProjectStore.getState().editorMode === 'loop') {
-    const audition = useAdaptiveStore.getState().audition
-    if (audition) { void auditionPassage(audition.slot, audition.mode); return }
-    const current = useAdaptiveStore.getState().playback.current
-    if (current) void startAdaptive(current)
+  if (useProjectStore.getState().editorMode === 'game-song') {
+    seekGameSong(0)
     return
   }
   void audioEngine.init().then(() => {

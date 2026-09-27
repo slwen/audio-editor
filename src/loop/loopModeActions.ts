@@ -1,6 +1,5 @@
 import { audioBufferFromChannels, writeWavStereo16 } from '@/audio/wavBytes'
 import { audioEngine } from '@/audio/AudioEngine'
-import { useAdaptiveStore } from '@/adaptive/store'
 import { getCachedBuffer } from '@/audio/bufferCache'
 import {
   downmix,
@@ -83,7 +82,6 @@ export function enterLoopModeFromSelection(): void {
   if (!buf) return
   const meta = st.bufferMeta.find((b) => b.id === clip.bufferId)
   stopPlayback()
-  useAdaptiveStore.setState({ open: false })
   st.setEditorMode('loop')
   useLoopStore.getState().startSession({
     sourceClipId: clip.id,
@@ -102,7 +100,6 @@ export function exitLoopMode(): void {
   analysisGen++
   terminateAnalysisWorker()
   stopPlayback()
-  useAdaptiveStore.setState({ open: false })
   useProjectStore.getState().setEditorMode('edit')
   useLoopStore.getState().clear()
 }

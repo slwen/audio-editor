@@ -14,7 +14,7 @@ import type { Clip } from '@/types'
 
 export type AudioExportFormat = 'mp3' | 'wav'
 
-export function encodeAudioBuffer(rendered: AudioBuffer, format: AudioExportFormat): Blob {
+function encodeAudioBuffer(rendered: AudioBuffer, format: AudioExportFormat): Blob {
   switch (format) {
     case 'wav':
       return new Blob([writeWavStereo16(rendered)], { type: 'audio/wav' })

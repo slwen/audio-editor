@@ -1,7 +1,7 @@
 import { mergeSavedLoops } from '@/loop/savedLoops'
 import { create } from 'zustand'
 import type { BufferId, ClipId } from '@/types'
-import { applyRatingRecord, collectTags, collectNotes, loopRatingKey, type LoopRatingRecord } from '@/loop/loopRatings'
+import { applyRatingRecord, collectTags, collectNotes, latestRatings, loopRatingKey, type LoopRatingRecord } from '@/loop/loopRatings'
 import { DEFAULT_LOOP_RENDER, loopRenderOptions } from '@/loop/renderSettings'
 import {
   clampVibeWindowSec,
@@ -199,9 +199,7 @@ export const useLoopStore = create<LoopState & LoopActions>((set, get) => ({
   }),
 
   replaceRatings: (records) => {
-    let ratings: Record<string, 'good' | 'bad'> = {}
-    for (const record of records) ratings = applyRatingRecord(ratings, record)
-    set({ ratingRecords: records, ratings, notes: collectNotes(records), tags: collectTags(records),
+    set({ ratingRecords: records, ratings: latestRatings(records), notes: collectNotes(records), tags: collectTags(records),
       candidates: mergeSavedLoops(get().candidates, records, get()) })
   },
 

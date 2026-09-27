@@ -441,7 +441,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
   },
 
   loadSnapshot: (snap) =>
-    set(() => {
+    set((s) => {
       const r = restore(snap)
       return {
         ...initialState,
@@ -452,11 +452,10 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
         })),
         selection: [],
         isPlaying: false,
-        editorMode: 'edit' as const,
+        // The Game song screen does not use timeline clips, so a late restore must not close it.
+        editorMode: s.editorMode === 'game-song' ? 'game-song' as const : 'edit' as const,
         undoStack: [],
         redoStack: [],
       }
     }),
 }))
-
-export { getProjectEndTime } from '@/lib/clipMath'

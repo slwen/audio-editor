@@ -1,19 +1,24 @@
 import type { Clip } from '@/types'
 
-/** Bright palette: waveforms + clip chrome accents */
+/** Chasm palette brights (neutrals excluded): waveforms + clip chrome accents */
 export const TRACK_ACCENT_HEXES = [
-  '#5d275d',
-  '#b13e53',
-  '#ef7d57',
-  '#ffcd75',
-  '#a7f070',
-  '#38b764',
-  '#257179',
-  '#29366f',
-  '#3b5dc9',
-  '#41a6f6',
-  '#73eff7',
+  '#85daeb',
+  '#5fc9e7',
+  '#5fa1e7',
+  '#5f6ee7',
+  '#ab58a8',
+  '#ca60ae',
+  '#ff5dcc',
+  '#f3a787',
+  '#fdfe89',
+  '#8dd894',
+  '#5dc190',
+  '#4ab9a3',
+  '#4593a5',
+  '#5efdf7',
 ] as const
+
+const TRACK_ACCENT_SET: ReadonlySet<string> = new Set(TRACK_ACCENT_HEXES)
 
 export function pickRandomTrackAccent(): string {
   return TRACK_ACCENT_HEXES[Math.floor(Math.random() * TRACK_ACCENT_HEXES.length)]!
@@ -47,6 +52,8 @@ export function stableAccentForClipId(id: string): string {
   return TRACK_ACCENT_HEXES[idx]!
 }
 
+/** Persisted accents from an older palette are remapped onto the current one. */
 export function clipAccentHex(clip: Clip): string {
-  return clip.accentColor ?? stableAccentForClipId(clip.id)
+  const saved = clip.accentColor?.toLowerCase()
+  return saved && TRACK_ACCENT_SET.has(saved) ? saved : stableAccentForClipId(clip.id)
 }

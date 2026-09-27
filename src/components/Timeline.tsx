@@ -15,7 +15,7 @@ import {
 } from '@/lib/clipMath'
 import { getPeaks } from '@/lib/peaksCache'
 import { edgeSnapStart } from '@/lib/snap'
-import { readCssColor, parseHexRgb } from '@/lib/themeCanvas'
+import { readCssColor, withAlpha } from '@/lib/themeCanvas'
 import { maxTimelineScrollPx, scrollForPlayheadCentered, TIMELINE_PAD_L } from '@/lib/timelineScroll'
 import { clipAccentHex } from '@/lib/trackAccent'
 import { clearStoredProject } from '@/persistence/projectDb'
@@ -195,16 +195,16 @@ export function Timeline() {
 
     const css = (name: string, fb: string) => readCssColor(name, fb)
 
-    ctx.fillStyle = css('--timeline-canvas-bg', '#1a1c2c')
+    ctx.fillStyle = css('--timeline-canvas-bg', '#25242c')
     ctx.fillRect(0, 0, w, h)
 
-    ctx.strokeStyle = css('--timeline-grid', 'rgba(86,108,134,0.35)')
+    ctx.strokeStyle = css('--timeline-grid', 'rgba(93,71,118,0.55)')
     ctx.lineWidth = 1
     const t0 = xt(0)
     const t1 = xt(w)
     const sec0 = Math.floor(Math.min(t0, t1))
     const sec1 = Math.ceil(Math.max(t0, t1))
-    ctx.fillStyle = css('--timeline-ruler-text', '#94b0c2')
+    ctx.fillStyle = css('--timeline-ruler-text', '#85daeb')
     ctx.font = '11px system-ui, sans-serif'
     for (let s = sec0; s <= sec1; s++) {
       const x = tx(s)
@@ -230,10 +230,9 @@ export function Timeline() {
       const ch = ROW_H - 12
       const isSelected = selectionSet.has(c.id)
       const accent = clipAccentHex(cc)
-      const { r: ar, g: ag, b: ab } = parseHexRgb(accent)
 
-      ctx.fillStyle = isSelected ? `rgba(${ar},${ag},${ab},0.22)` : `rgba(${ar},${ag},${ab},0.08)`
-      ctx.strokeStyle = isSelected ? `rgba(${ar},${ag},${ab},0.92)` : `rgba(${ar},${ag},${ab},0.38)`
+      ctx.fillStyle = withAlpha(accent, isSelected ? 0.22 : 0.08)
+      ctx.strokeStyle = withAlpha(accent, isSelected ? 0.92 : 0.38)
       ctx.lineWidth = isSelected ? 2 : 1
       ctx.beginPath()
       const radius = 6
@@ -245,7 +244,7 @@ export function Timeline() {
       const peaks = getPeaks(c.bufferId)
       if (buf && peaks && peaks.length >= 2) {
         const buckets = peaks.length / 2
-        ctx.strokeStyle = `rgba(${ar},${ag},${ab},0.88)`
+        ctx.strokeStyle = withAlpha(accent, 0.88)
         ctx.lineWidth = 1
         ctx.beginPath()
         const mid = y0 + ch / 2
@@ -266,7 +265,7 @@ export function Timeline() {
         ctx.stroke()
       }
 
-      ctx.fillStyle = css('--ui-text', '#f4f4f4')
+      ctx.fillStyle = css('--ui-text', '#f5daa7')
       ctx.font = '12px system-ui, sans-serif'
       ctx.fillText(c.label ?? nameByBuffer.get(c.bufferId) ?? 'clip', x0 + 8, y0 + 18)
     }
@@ -274,7 +273,7 @@ export function Timeline() {
     for (const c of clipsDrawOrder) drawClip(c)
 
     const phx = tx(playhead)
-    ctx.strokeStyle = css('--timeline-playhead', '#ef7d57')
+    ctx.strokeStyle = css('--timeline-playhead', '#ff5dcc')
     ctx.lineWidth = 2
     ctx.beginPath()
     ctx.moveTo(phx, 0)
@@ -287,8 +286,8 @@ export function Timeline() {
       const y = Math.min(mq.y0, mq.y1)
       const rw = Math.abs(mq.x1 - mq.x0)
       const rh = Math.abs(mq.y1 - mq.y0)
-      ctx.fillStyle = css('--timeline-marquee-fill', 'rgba(65,166,246,0.1)')
-      ctx.strokeStyle = css('--timeline-marquee-stroke', 'rgba(115,239,247,0.45)')
+      ctx.fillStyle = css('--timeline-marquee-fill', 'rgba(95,201,231,0.1)')
+      ctx.strokeStyle = css('--timeline-marquee-stroke', 'rgba(94,253,247,0.5)')
       ctx.fillRect(x, y, rw, rh)
       ctx.strokeRect(x, y, rw, rh)
     }

@@ -20,7 +20,7 @@ type ActiveChain = {
   gain: GainNode
 }
 
-export class AudioEngine {
+class AudioEngine {
   private stopListeners = new Set<() => void>()
 
   onStop(listener: () => void): () => void {

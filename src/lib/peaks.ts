@@ -1,5 +1,5 @@
 /** Max/min peaks per bucket for waveform drawing */
-export function computePeaks(
+function computePeaks(
   channelData: Float32Array,
   bucketCount: number
 ): Float32Array {

@@ -7,6 +7,10 @@ export function rememberOriginalBytes(id: BufferId, bytes: ArrayBuffer): void {
   originals.set(id, bytes)
 }
 
+export function getOriginalBytes(id: BufferId): ArrayBuffer | undefined {
+  return originals.get(id)
+}
+
 export function takeOriginalBytesMap(): Record<string, ArrayBuffer> {
   const out: Record<string, ArrayBuffer> = {}
   for (const [k, v] of originals) out[k] = v

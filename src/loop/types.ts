@@ -33,7 +33,7 @@ export type LoopCandidate = {
   closureScore?: number
 }
 
-export type LoopSessionStatus = 'idle' | 'analyzing' | 'ready' | 'error'
+type LoopSessionStatus = 'idle' | 'analyzing' | 'ready' | 'error'
 
 export type LoopSession = {
   sourceClipId: ClipId

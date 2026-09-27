@@ -1,6 +1,6 @@
 export type ClipId = string
 export type BufferId = string
-export type EditorMode = 'edit' | 'loop'
+export type EditorMode = 'edit' | 'loop' | 'game-song'
 
 export interface Clip {
   id: ClipId

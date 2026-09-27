@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
-import { AdaptiveMusicPreview } from '@/components/AdaptiveMusicPreview'
-import { useAdaptiveStore } from '@/adaptive/store'
-import { syncTransitionFeedback } from '@/adaptive/actions'
 import { audioEngine } from '@/audio/AudioEngine'
+import { GameSongScreen } from '@/components/GameSongScreen'
+import { importSongFile } from '@/gameSong/actions'
 import { Inspector } from '@/components/Inspector'
 import { LoopInspector } from '@/components/LoopInspector'
 import { LoopTimeline } from '@/components/LoopTimeline'
@@ -15,9 +14,7 @@ import { useProjectStore } from '@/store/useProjectStore'
 
 export default function App() {
   const editorMode = useProjectStore((s) => s.editorMode)
-  const adaptiveOpen = useAdaptiveStore(s => s.open)
   useProjectPersistence()
-  useEffect(() => { void syncTransitionFeedback() }, [])
 
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
@@ -25,9 +22,14 @@ export default function App() {
     }
     const onDrop = (e: DragEvent) => {
       e.preventDefault()
-      if (useProjectStore.getState().editorMode === 'loop') return
+      const mode = useProjectStore.getState().editorMode
+      if (mode === 'loop') return
       const files = [...(e.dataTransfer?.files ?? [])]
       if (files.length === 0) return
+      if (mode === 'game-song') {
+        void importSongFile(files[0]!)
+        return
+      }
       const hasClips = useProjectStore.getState().clips.length > 0
       void ingestAudioFiles(files, hasClips)
     }
@@ -63,7 +65,7 @@ export default function App() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return
       if (e.code === 'Space' && e.target instanceof HTMLElement && e.target.closest('button')) return
-      const looped = useProjectStore.getState().editorMode === 'loop'
+      const looped = useProjectStore.getState().editorMode !== 'edit'
       if (e.code === 'Space') {
         e.preventDefault()
         void togglePlayback()
@@ -108,7 +110,7 @@ export default function App() {
     <div className="app">
       <TransportBar />
       <main className="app__main">
-        {editorMode === 'loop' && adaptiveOpen ? <AdaptiveMusicPreview /> : editorMode === 'loop' ? (
+        {editorMode === 'game-song' ? <GameSongScreen /> : editorMode === 'loop' ? (
           <>
             <LoopTimeline />
             <LoopInspector />

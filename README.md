@@ -1,111 +1,218 @@
-# Audio editor
+# Audio editor — Game Song
 
-A local React audio editor with a loop workspace for dynamic game music.
+A local Vite + React tool that turns an ordinary song into looping, two-layer game music. It splits the song into a **base** stem (drums & bass, always playing) and a **top** stem (everything else, louder in fights), helps you pick and rate a seamless loop, and exports a small pack a game can play adaptively.
+
+The app also still contains the original multitrack editor (**Edit**) and the **Find loops** workspace; the **Game song** button in the top bar opens the workflow described here.
+
+## Setup
+
+Requirements:
+
+- Node.js with npm.
+- `ffmpeg` on `PATH` — used for decoding, loudness measurement and MP3 encoding.
+- Demucs in a Python venv at `~/.cache/audio-editor-demucs` (the path is fixed in `server/stems.ts`). Install once:
+
+  ```sh
+  python3 -m venv ~/.cache/audio-editor-demucs && ~/.cache/audio-editor-demucs/bin/python -m pip install -U demucs numpy
+  ```
+
+  If it is missing, the Game song screen shows this command with a Copy button.
 
 ```sh
 npm install
-npm run dev
+npm run dev        # http://localhost:5173
 ```
 
-Drop a song onto the timeline, select it, and choose **Find loops**. Analysis assumes a steady **4/4** beat. The default **Long loops** view shows 4–16-bar candidates; choose All or 1/2 bars in Filters for short motifs and stingers. Length quotas keep short loops from crowding out longer phrases. The detector may return no long loops when the song changes too much.
+Stem splitting, ratings and export run as Vite dev-server middleware under `/__game-song` (`server/gameSongPlugin.ts`), so they only work with `npm run dev`, not a static build. No environment variables are needed.
 
-- **Hear seam** starts one bar before the wrap; **Hear full loop** auditions the entire bed. Space starts/stops playback. Shift-click selects multiple candidates.
-- **Saved loops** restores exact rated or annotated cuts independently of the latest detection results. It opens with Good cuts when available, preserves their original BPM and boundaries, and ignores new score thresholds. Historical scores are labeled; saved preview settings are restored when selecting a cut.
-- Mark **Good / Bad**, add a note, and tag **exploration / tension / combat / intensity / stinger**. Tags are listener-assigned. Feel and Review filters find saved decisions and stay synchronized with the timeline. New candidates default to Not marked Bad; use All or Bad to revisit rejected cuts. When a vote hides its row, a Last review panel keeps the exact cut available for a note and quick failure reasons.
-- **Adjust seam, length & tempo** exposes whole-bar resizing, beat shifts, seam softening, crossfade, and manual BPM correction. Raw, Click repair, ½ beat and 1 beat blend presets act on the selected cut. Long blends are manual options; check the join and rhythm before saving. Each cut keeps its own blend and normalization through selection, reanalysis, export and copying. Mark or annotate a cut to retain its settings in the saved library. Scores are rankings, not probabilities or a guarantee of musical suitability.
-- **Export loop pack** downloads one ZIP containing PCM WAVs and a JSON manifest with tags, notes, source cuts, BPM, bar counts, sample rate/count, and rendering settings. Each WAV is exactly the selected loop length, without a duplicated tail or shortened overlap. Every manifest entry records its own requested/effective blend and normalization; shared fields are null when settings differ.
-- **Copy to timeline** creates independently editable, rendered clips. They use the same samples as preview/export and persist with the project. Use the editor's Duplicate command to repeat them.
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Dev server (app + `/__game-song` endpoints) |
+| `npm run split-stems -- sample_songs/<song>.mp3` | Same stem split from the command line |
+| `npm test` / `npm run lint` / `npm run build` | Vitest, ESLint, type-check + production build |
+| `npm run analyze -- sample_songs/<song>.mp3` | Writes `analysis/<song>.songmap.json` (beat grid, bar features, likely jumps) |
+| `npm run eval:loops` | Replays `loop-ratings.jsonl` against the Find loops detector |
 
-The seam crossfade blends the source continuation after the end into the head, preserving duration. The default remains 35 ms. Long blends are limited by available continuation and one quarter of the loop; at the end of the source only a 5 ms click repair is available. Preview, exported WAVs, and timeline copies share this renderer. Normalization defaults off so quieter exploration beds remain quieter than combat beds; enable it when independent peak normalization is desired. A crossfade repairs a small splice, not an incompatible phrase change.
+Files the workflow creates in the repo:
 
-## Adaptive music preview
+- `sample_songs/<song>` — imported source audio.
+- `analysis/<song>.layers/base.wav`, `top.wav` — stems (48 kHz stereo float, exactly the source length).
+- `game-song-ratings.jsonl` — Good/Bad wrap ratings.
 
-Open a song with **Open audio** or drag it onto the editor, select it, choose **Find loops → Adaptive preview**. The song map shows repeatable sections at their original positions. Choose Exploration or Combat, then use **Previous section** and **Next section** to select one. Press **Start preview**; that whole section repeats until you request another section or mood. A request waits for a suitable musical point, then playback jumps. The same buttons request a jump during playback and wrap around at the ends. Cathedral of Iron currently has two exploration sections and three combat sections. Rate the specific jump you heard Good or Bad; Good makes that directed jump reusable. Exploration/combat jump checks sit in **Find better exploration ↔ combat jumps**, and the broader passage editor remains in **More loop choices, timing and export**.
+## Workflow
 
-**When is it ready to try in a level?** summarizes each section's approved jump to the other mood, reachability from the selected start, and the longest gap between approved exit points. This is a first playtest threshold, not a guarantee of musical quality. A combat-heavy level also benefits from approved same-combat moves so longer fights can vary without briefly returning to exploration. Test with real encounter lengths and approve only joins that sound right there.
+Click **Game song** in the top bar. Space plays/stops.
 
-**Hear combat switch** and **Hear exploration switch** start one bar before a proposed jump from the selected or playing section. Rate the heard join **Good** to make that exit available to the game preview, or **Bad** to try another. **Hear next option** auditions another exit or destination entry without removing earlier Good points. When the game requests a feel change, the current loop keeps playing and takes the next Good exit to any reviewed destination section; each reviewed exit recurs on every repetition. The finder checks each bar of the playing loop against the first four entry bars of each destination, ranks the audio around each join, and prioritizes candidates that shrink the longest gap between Good exits. The preview shows that gap and what approving the next option could reduce it to. **Edit song markers** keeps the waveform and your rough Exploration/Combat flags: click to seek, play from there, mark changes, then **Update draft from markers**. The draft does not yet play through the full song arrangement between holds.
+### 1. Import a song
 
-**Ease out of combat over** sets a minimum blend for Combat → Exploration. It defaults to one bar (about 2.4 seconds for Cathedral); two bars is available for a slower return. The longer blend applies to previously reviewed returns too, without discarding their Good ratings. A loop arrival can keep fading in across its wrap, so entering the last bar no longer caps the blend near 0.6 seconds. Changing the setting stops the current preview; start it again to hear the new blend.
+Drop an audio file anywhere on the page, **Choose file…**, use the clip currently in the editor, or pick a song used before. The file is copied to `sample_songs/`.
 
-### Advanced editing
+### 2. Split into two layers
 
-The advanced view focuses on Exploration and Combat; **Show other feels** restores the other tabs. Each state holds a collection of passages. **Add Good tagged loops** adds approved cuts without replacing existing song passages. **Browse loops** offers waveform rows with inline listening before adding, plus All feels and Include unrated filters. Existing single-loop setups migrate to one-item collections without changing their chosen cuts or timing settings.
+**Split stems** runs Demucs `htdemucs` (a few minutes). `drums + bass` become `base.wav`, `other + vocals` become `top.wav`; both are padded/trimmed to the source length so loop times match the original. Existing stems are reused unless the source file is newer.
 
-For a combat-heavy, two-state test such as *Cathedral of Iron*, click **Prepare two-state study**. It puts the longest Good combat bed first, chooses the nearest earlier Good exploration bed, starts the simulator in Combat, and turns on reviewed-only routing. Other saved passages remain available. Combat can repeat indefinitely while no tested exit exists. Select any directed pair in **Try one connection**, press **Hear this join**, then rate the completed join Good or Bad. Good adds the heard exit bar, entry bar, and blend to that pair's approved points; another Good point can be added without replacing it. Bad removes only the heard point. Changing pair timing clears those approvals until they are heard again. An unrated jump cannot occur during normal playback when **Only use reviewed jumps** is on. Exact source continuations remain available.
+### 3. Pick the loop
 
-The song overview shows selected hold points, included source passages, and unused audio in separate feel lanes. **Hear loop** auditions the exact rendered loop; **Hear passage** plays a source passage once; **Hear song from here** plays the untouched song onward to the source trim end. These listening modes are distinct from the game simulator and stop one another. Space/transport Stop also stops inline listening.
+The game plays the song from 0. When it reaches **Wrap at**, it blends back to **Loop back to** and repeats until the level ends, then plays out to the end of the file.
 
-Between non-overlapping sections of one feel, gap cards show exactly which audio is being skipped. **Hear gap** auditions that span; **Include this part of the song** adds the entire original span as a one-shot, including any partial bars. The adaptive player then prefers the continuous route through it. The gap's mood is explicitly unreviewed: including it does not infer that all intervening music matches the endpoint tags. No all-to-all transition compatibility is required; use tested jumps, natural continuations, and holds where appropriate. Playback behaviour is collapsed by default; pair tuning opens only for the selected jump or latest played connection.
+- **Waveform and markers** — drag **Loop back to** (loop start) and **Wrap at** (loop end), or nudge them with ‹ ›. **Snap to** Bars or Beats. Shaded regions have few drums.
+- **Blend** — crossfade length at the wrap: Tiny (35 ms click repair), ½ beat, 1 beat, 1 bar, or 1 second (default). Fades of 0.3 s or more are equal-power; shorter ones are linear. The fade is clamped so it fits inside the loop and the file.
+- **Hear wrap** plays across the seam; **Hear from start** plays the song as the game would; **Stop**.
+- **Seam** — the jump model's estimated chance the wrap sounds good.
+- **Good / Bad** — your verdict on this exact wrap. Each click appends a record to `game-song-ratings.jsonl` (`{ version: 1, at, sourceName, exitSec, entrySec, fadeSec, rating: "good" | "bad" | "clear" }`); the latest record per song and wrap wins. Ratings from the older tools (`pack-ratings.jsonl`, `analysis/<song>.pack.json`) are also read and shown as "Rated … in the old tools".
+- **Suggestions** — ranked wraps of at least 60 s, from the jump model, the drums & bass level (quiet intros/breakdowns are avoided), where the top layer drops out and returns, and earlier Good/Bad ratings. **Try next suggestion** cycles through them.
+- **Warnings** — loop shorter than 60 s, loop start in the intro or a quiet part, or long quiet stretches inside the loop.
+- **Calm mode / Calm level** — preview how the song sounds outside combat, with the top stem at the calm level (default `0.1`, `DEFAULT_CALM_LEVEL` in `src/gameSong/store.ts`; slider 0–50 %). **Hear fight → calm** plays the top stem at full, then fades it to the calm level over 8 s. The calm level is a preview setting saved in the browser; it is **not** written to `song.json` — set the matching value in the game.
 
-**Let the music move through sections** advances at passage ends even while the gameplay state stays unchanged. It prefers adjoining source sections, then material heard less recently, and excludes cuts that overlap the current passage by 65% or more. Choose one, two, or four repetitions of a bed before moving on. A lone usable loop keeps repeating. **Include following bars** includes the next 4–16 whole bars of the source as an unscored one-shot section, preserving builds, fills, and development that might not form a good loop. Its mood needs auditioning; it has no inferred Good rating. One-shot sections move on or finish rather than repeating an untested wrap.
+Preview and export use the same wrap logic (`src/gameSong/wrap.ts`), so what you hear is what ships.
 
-For adjoining passages with unnormalized audio and entry at bar one, the outgoing source joins the untouched incoming source at the passage boundary. The first arrival uses raw audio; if the destination is a loop, later repetitions use its approved wrap rendering. Other connections use complementary linear crossfades. Source passages include available post-roll for outgoing fades. **Connection settings** customize a directed pair's exit grouping, destination entry bar, and blend, or exclude that connection. **Tune this connection** beside a completed transition selects it for adjustment. Automatic progression uses passage ends; exit grouping applies to gameplay requests.
+### 4. Export to the game
 
-Request any state at any time. The latest request replaces pending gameplay changes and automatic progression; requesting the playing state cancels a gameplay change and resumes its collection. Repeated requests do not keep delaying an exit. Escalation queues immediately; de-escalation defaults to three seconds followed by a boundary. A one-shot must leave by its end rather than waiting beyond it. Shared passages can satisfy a new state without restarting. New setups use two-bar exits and one-beat blends; existing settings are preserved. Blends range from 5ms click repair through two bars, capped to a quarter of the source and half of a looping destination; one-shot arrivals are capped by available audio. A new change waits for an active arrival fade to finish. Each passage retains its native tempo; boundaries alone do not guarantee compatible harmony.
+- **Song id** — lowercase letters, digits and dashes (`cathedral-of-iron`); used for file names.
+- **Title** — display name.
+- **Game music folder** — absolute path the files are copied into (remembered in the browser's localStorage; the default is set by `DEFAULT_GAME_FOLDER` in `src/gameSong/store.ts`). Leave empty and use **Download ZIP** instead.
+- **Cut the silence after the song ends** (default on) — trims to 1 s after the last sound, never before the loop's crossfade ends.
+- **Mono drums & bass** — smaller base file.
+- **Higher quality** — 128 kbps full band instead of 96 kbps with a 16 kHz cutoff.
 
-Space and transport controls operate the preview while it is open. Leaving stops playback. Stop to edit setup. Web Audio schedules sources and gains ahead; the UI timer advances the playlist scheduling and cleans up faded voices. If a loop has no allowed next passage, it continues holding.
+**Export to game** then:
 
-Rate transitions Good/Bad and add notes, including after stopping. Events append to `transition-ratings.jsonl`, separate from loop ratings, with source identity, both cuts, actual exit/entry offsets, blend duration, natural-continuation flag, and revisions. Existing browser reviews migrate for all songs when the app opens; retries are deduplicated. Browser storage is retained as recovery if the dev server is unavailable. Save status and retry are visible in the preview. Setups and pair rules are saved per source in this browser.
+1. Measures loudness of base + top summed and applies the **same gain to both stems** to reach −14 LUFS, limited so true peak stays below −1 dBFS.
+2. Encodes both stems to 48 kHz MP3 and checks they decode to identical sample lengths.
+3. Checks encoder delay is constant along the file; a constant delay is compensated by shifting both loop points.
+4. Writes the files to a staging folder, then copies them to the game folder.
 
-**Export adaptive pack** writes version 5 `adaptive-music.json` with passage arrays per state, directed route approvals and multiple exit points, direction-specific return blending, progression settings and transition reviews. WAVs include rendered beds, raw first-arrival files for natural continuation, and post-roll files for one-shot transitions. The manifest distinguishes logical passage length from its post-roll file. This is data for a game music controller, not an engine integration. Authored bridge routing and stingers remain future extensions.
+Output:
 
-Tests cover rapid requests, cancellation, repeat suppression, one-shot progression, per-pair rules, entry offsets, long fades, exact-duration boundaries, and feedback migration/retry. Browser checks use Crypts audio; offline rendering verifies cancelled changes remain inaudible and adjoining passages reproduce the original samples across their join.
-
-## Song map for agents
-
-`npm run analyze -- sample_songs/<song>.mp3` (or no arguments for every file in `sample_songs/`) writes `analysis/<song>.songmap.json`: one global-tempo beat grid, bars with loudness, brightness, onset density and chroma, and the most likely Good jumps from every exit beat. A jump leaves at `exitBeat` and continues at `entryBeat`, forwards or backwards; both are always a whole number of bars apart, so the meter continues even when the heuristic downbeat is wrong. Each jump has `pGoodCut` (35 ms click repair) and `pGoodBlended` (about one second of crossfade), plus the seam, vibe, join-continuity and phrase-closure measures behind them. Requires ffmpeg.
-
-`npm run calibrate:jumps` refits those probabilities from both listening logs and regenerates `src/pack/trainedJumpModel.ts`. Loop-wrap results are held out by song, transitions by section pair. Phrase closure plus a cut/blend flag won; the other score parts and level changes did not improve held-out results. Held-out loop wraps predicted at 0.7 or above were 88% Good; below 0.5, about 22%. Transitions rank less well (AUC about 0.70; Combat → Exploration about 0.58). Nearly all rated transitions are from Cathedral, so the blend bonus is untested on other songs. `npm run eval:jumps` compares raw jump scores with the current detector and route suggestions.
-
-## Song-map packs
-
-Song markers (Edit song markers in the adaptive preview) are saved to `song-zones.json` whenever they change, and once when the preview opens, so markers made before this file existed migrate automatically.
-
-`npm run build-pack -- sample_songs/<song>.mp3` combines the song map with those markers into `analysis/<song>.pack.json`. Without markers it guesses combat from loud, busy stretches and says so. It prints, for each zone, where it will jump back to keep that feel going (the hold) and the longest wait for a good switch to the other feel.
-
-Joins you already judged are included exactly as rated, at their own times and crossfades: Good loop wraps, Good adaptive-preview transitions and Good simulator joins are planned with P(Good) 0.95; model jumps you rated Bad in any tool are removed.
-
-The runtime plays the song in its own order. Each zone holds once per pass, at the exit that keeps the most music in play (the zone heard before leaving plus the fresh material after arriving); approved holds count fully and model holds at 75%, and model holds avoid a zone's last two bars, which usually build into the next section. Arrivals prefer music not heard recently. A feel request takes the song's own change if it is imminent, otherwise the earliest planned jump into the other feel (P(Good) ≥ 0.6, one-second blend); after 16 beats it takes the least-bad jump and labels it a fallback. Returning to exploration waits a 3-second release. Holds that pass as a cut use a 35 ms click repair.
-
-Combat also has two stingers made from the song itself. A **lead-in** jumps, on a beat a whole number of bars before it, into the bar just before a combat entrance and lets the song's own build play into combat; nothing interrupts it. A **hit cut** cuts straight to a combat entrance's first beat with an 80 ms crossfade, relying on the entrance hit to mask the change. A combat request takes a good direct switch when one exists, otherwise a lead-in unless a good direct switch is at most two beats away, and a hit cut after four beats. An urgent request (the game's "combat now", or `--urgent` in `npm run simulate`) takes a hit cut at the next beat. Stinger ratings block or approve those exact joins but are kept out of join-model calibration.
-
-`npm run simulate -- sample_songs/<song>.mp3 [--minutes 10] [--seed 1]` plays a random level (exploration 20–80 s, combat 15–90 s) and writes the audio and every join to `analysis/<song>.sim-<seed>.wav/.json`, with switch latency, join counts, coverage and the longest stretch without repetition.
-
-**Test the finished pack** at the top of the adaptive preview plays the same runtime live. Use Exploration/Combat (E/C), optionally random switches, and rate each heard join Good/Bad (G/B for the latest). Ratings append to `pack-ratings.jsonl`, and `npm run calibrate:jumps` includes them.
-
-### Using a pack in a game
-
-`npm run export-pack -- sample_songs/<song>.mp3 --to <game>/client [--bitrate 80k]` writes the built pack and a compressed MP3 of the song into `<client>/sfx/music/adaptive/`, and the runtime (`packFormat.ts`, `runtime.ts`, `livePlayer.ts` from `src/pack/`, which have no other dependencies) into `<client>/src/audio/adaptive/vendor/`. It compares the encoded audio with the original at four points and fails if they drift apart; a constant encoder delay is reported but harmless, since it shifts every exit and entry alike. The game should not re-encode the file again. Edit the runtime here and export again rather than editing the copies. In the game, `PackLivePlayer.request('combat' | 'exploration', urgent)` drives the music; `urgent` combat hit-cuts at the next beat. The optional `mix` option (`DEFAULT_PACK_MIX`) keeps exploration 7 dB down and gently low-passed at 4 kHz, opens to +2 dB over 1.1 s as combat audio arrives (halfway during a lead-in's build), settles back over 3.5 s, and dips same-feel holds by 4 dB over 1.6 s; `onFeel` reports those changes on the audio clock so other layers can follow. The simulator's **Game mix** toggle uses the same mix. Pack JSON is rounded on export (0.1 ms, three-place probabilities) and checked against an unrounded simulation.
-
-`npm run split-stems -- sample_songs/<song>.mp3` separates the song with local Demucs (`htdemucs`) into `analysis/<song>.layers/base.wav` (drums and bass, played through the level) and `top.wav` (everything else, faded in for intense moments). Both are 48 kHz stereo and the same length as the original, so jump times still line up. When those files exist, export encodes `<song>.base.mp3` and `<song>.top.mp3` at the same bitrate instead of the full mix, deletes a stale full-mix MP3, and runs the drift check on the sum of the two encoded layers.
-
-## Listening feedback
-
-While running the development server, ratings, notes, and tags append to `loop-ratings.jsonl`. Notes and tags are separate events and do not overwrite listening votes. Records include the analysis version and preview rendering settings. Existing logs without those fields remain readable. This endpoint is provided by Vite's development server; static production hosting alone does not persist the log.
-
-The evaluator replays the latest decision per exact source/cut, preserves note-only updates, honors cleared ratings, and rescoring never shifts a rated cut. New candidates are not assumed good merely because they are close to a rated loop. Votes for musical blends longer than 120 ms are reported separately from original-cut ranking: a successful repair must not relabel the original rejected splice. Notes on a new rendering do not inherit a listening vote from another rendering.
-
-```sh
-npm test
-npm run build
-npm run lint
-# Requires ffmpeg on PATH, sample_songs/, and loop-ratings.jsonl:
-npm run eval:loops
-# Optional per-cut machine-readable results:
-LOOP_EVAL_JSON=/tmp/loop-evaluation.json npm run eval:loops
+```text
+<game music folder>/
+  <id>.base.mp3     drums & bass (stereo, or mono if chosen)
+  <id>.top.mp3      everything else
+  <id>.song.json    metadata below
 ```
 
-Evaluation defaults to a 48,000 Hz stereo decode, then uses the same downmix and analysis preparation as the browser (24,000 Hz analysis). Set `LOOP_SOURCE_SAMPLE_RATE=44100` for a browser using 44,100 Hz. The report includes exact-cut score reproduction, per-song and per-length ranking, current-version decisions, listener notes, and generated length coverage. It does not inject feedback into candidate scores. `LOOP_DETECTOR_FILE=/absolute/path/detector.ts` evaluates an experimental detector without changing the running application.
+### `song.json` (`game-song-v1`)
 
-On the 174 distinct listening decisions in the September 22 evaluation (68 Good, 106 Bad), phase closure improved top-20 results from 13 Good / 7 Bad to 18 Good / 2 Bad, and ranking AUC from 0.618 to 0.776. Cathedral improved from 0.458 to 0.664. The evaluator reproduced 17 current-version browser scores within 0.000034. These are development-set measurements on three tracks, not held-out perceptual validation. The report separates 4/8/16-bar beds so aggregate improvements cannot conceal a loss of useful long loops.
+```json
+{
+  "version": "game-song-v1",
+  "id": "cathedral-of-iron",
+  "title": "Cathedral Of Iron",
+  "sourceName": "cathedral-of-iron.mp3",
+  "bpm": 98.477,
+  "durationSec": 241.68,
+  "loop": { "startSec": 63.685, "endSec": 183.104, "fadeSec": 1 },
+  "loudness": { "integratedLufs": -14, "gainDb": -2.63 }
+}
+```
 
-The search considers alternatives in every bar rather than requiring the whole phrase to repeat later in the source. It returns 4/8/16-bar options on Cathedral and Graveyard; the listening log now includes accepted Cathedral 8-bar exploration and 16-bar combat/intensity cuts. Musical/background mismatches remain among the rejected cuts. Higher-resolution harmonic penalties and longer comparison windows were evaluated offline but not shipped: they removed accepted long beds or regressed other tracks.
+| Field | Meaning |
+| --- | --- |
+| `version` | Always `"game-song-v1"`. |
+| `id` | Matches `^[a-z0-9]+(-[a-z0-9]+)*$` and the file name prefix. |
+| `title`, `sourceName` | Display name; original file name. |
+| `bpm` | Detected tempo (3 decimals). |
+| `durationSec` | Exact length of both MP3s after trimming. |
+| `loop.startSec` / `loop.endSec` | Loop back to / Wrap at, in seconds from file start. `0 ≤ startSec < endSec ≤ durationSec`. |
+| `loop.fadeSec` | Crossfade length, centred on the wrap. |
+| `loudness.integratedLufs` / `gainDb` | Loudness after export; gain applied to both stems. |
 
-The detector compares matching musical phases around both cut points, including quiet spectral bands beneath dense foreground audio. Fractional tempo refinement across up to 16 beats reduces accumulated timing drift. Tests cover long-bed duration, tempo drift, background-layer changes, stereo seam continuity, mono WAV export, ZIP integrity, and feedback replay.
+The type and builder are in `src/gameSong/songJson.ts`; export code is in `server/exportGameSong.ts`.
 
-Manual beat shifts and region resizing rescore in the analysis worker using the same complete source, downmix, sample rate and feature-grid origin as detection. The first edit caches the features; subsequent edits reuse them. Cancelled or superseded analyses reject pending work, and late results cannot update another source. On the Cathedral browser check, moving a 4-bar cut one beat and back restored its original score exactly; the edits took about 20 ms each after caching.
+**Wrap semantics.** Let `h = fadeSec / 2`. During output time `endSec − h … endSec + h`, the outgoing voice continues reading the file at `endSec + s` and fades out, while the incoming voice reads `startSec + s` and fades in (`s` runs from `−h` to `+h`). After the fade only the incoming voice plays, and the next wrap happens `endSec − startSec` seconds later. Curves are equal-power (`sin`) when `fadeSec ≥ 0.3`, otherwise linear. The file always contains at least `endSec + h` of audio.
 
-A median-filter harmonic/percussive separation experiment was also checked against all 174 rated cuts. It improved some rejected long loops but raised the scores of both explicitly reported Cathedral background mismatches (165.42s and 91.12s) and regressed Undead, so it remains outside the application.
+## Building a compatible game audio system
 
-The listener also rejected one-beat crossfade comparisons for both Cathedral cuts: neither recording sounded good and the cuts were not seamless. These attempts are logged as Bad rendering variants. Extending the blend is not a validated repair for these failures; detection needs better musical boundaries.
+Give the prompt below to a coding agent working in your game's repository. It is engine-agnostic; a Web Audio reference implementation exists but is not required.
+
+````text
+You are implementing an adaptive music system in this game. First inspect the game's existing audio
+code (engine, audio APIs, asset loading, how levels start and end, any combat or threat state) and
+summarise what you found. Ask me questions wherever the engine differs from the assumptions below
+(e.g. no sample-accurate scheduling, streaming-only audio, no per-voice gain automation) before
+writing code. Keep music on its own bus/mixer/context, separate from sound effects.
+
+## Asset format ("game-song-v1")
+
+A music folder contains one or more songs. Each song `<id>` is three files:
+- `<id>.base.mp3` — drums & bass. Always audible.
+- `<id>.top.mp3` — everything else. Volume follows game intensity.
+- `<id>.song.json`:
+  {
+    "version": "game-song-v1",
+    "id": "cathedral-of-iron",          // ^[a-z0-9]+(-[a-z0-9]+)*$, equals the file prefix
+    "title": "Cathedral Of Iron",
+    "sourceName": "cathedral-of-iron.mp3",
+    "bpm": 98.477,
+    "durationSec": 241.68,              // exact length of both MP3s
+    "loop": { "startSec": 63.685, "endSec": 183.104, "fadeSec": 1 },
+    "loudness": { "integratedLufs": -14, "gainDb": -2.63 }
+  }
+Both MP3s decode to exactly the same number of samples and are already loudness-matched
+(-14 LUFS across songs), so play them at the same gain with no extra normalisation. Loop times are
+seconds from the start of the file.
+
+Validate every song.json on load: version must equal "game-song-v1"; id must match the regex and the
+file name; all numbers finite; 0 <= loop.startSec < loop.endSec <= durationSec; fadeSec >= 0. Skip
+(and log) invalid songs instead of crashing.
+
+## Required behaviour
+
+1. Stems in lockstep. Start base and top at file position 0 at the same scheduled audio-clock time.
+   They must never drift; every operation (wrap, stop, fade) applies to both at the same time.
+
+2. Sample-accurate loop wrap with crossfade. Play from 0. When playback reaches loop.endSec, continue
+   from loop.startSec, forever, until the level ends. With h = fadeSec / 2:
+   - Schedule a new pair of voices so that at output time T_wrap - h it starts reading the file at
+     loop.startSec - h, fading in over fadeSec; the current voices keep reading past endSec
+     (up to endSec + h) and fade out over the same window. The fade is centred on the wrap.
+   - Curves: equal-power (gain_in = sin(x*pi/2), gain_out = cos(x*pi/2)) if fadeSec >= 0.3,
+     linear otherwise; x goes 0..1 across the fade.
+   - Next wrap is (endSec - startSec) seconds after the previous one.
+   - Schedule each wrap on the audio clock at least one loop ahead (or as far ahead as the engine
+     allows), never from a frame/update timer. Do not rely on native looping if it cannot express
+     loop-start/end with a crossfade (e.g. Web Audio's AudioBufferSourceNode ignores loopEnd when
+     loopStart is 0 in Chromium); use explicitly scheduled voices instead.
+
+3. Intensity-driven top stem. The top stem's gain follows a game intensity signal:
+   gain = calm + (1 - calm) * intensity, where intensity is 0..1 (or 0/1 for combat off/on).
+   - calm is a configurable floor (default 0.1); 0 silences the top stem when calm.
+   - Ramp towards the target over several seconds (default ~6 s, configurable) rather than jumping;
+     retarget smoothly if intensity changes mid-ramp. The base stem stays at full.
+
+4. Level end = play out. When the level ends, cancel any pending wraps and let the current voices
+   run to the end of the file, then fade out (a few seconds, or naturally at end of file). If the
+   level ends mid-crossfade, keep whichever voice continues into the file.
+
+5. Song rotation. Each level picks a song from the available list, never the one that just played
+   (unless only one exists). The next level's song crossfades in over ~4 s (configurable) while the
+   previous song plays out/fades.
+
+6. Memory and loading. Decode (or open streams for) only the current song and the next one; preload
+   the next song during the current level and release songs that are no longer current/next.
+   If the next song isn't ready when needed, start it as soon as it is, rather than blocking.
+
+7. Robustness. Handle audio-context suspension/resume (autoplay policies, app backgrounding) without
+   losing sync between stems or breaking the wrap schedule; handle pause if the game pauses music.
+
+## Hooks the game must provide
+
+- setIntensity(value 0..1)  — or setCombat(on: boolean) mapped to 1/0.
+- onLevelStart(levelId?)    — pick/start (or crossfade to) a song.
+- onLevelEnd()              — stop wrapping, play out.
+- Optional: setMusicVolume(0..1), pause()/resume(), forceSong(id) for debugging.
+
+## Deliverables
+
+- The music system module(s) and the wiring to the hooks above.
+- A song list/manifest discovery that works with this engine's asset system.
+- Tests for the pure parts (song.json validation, wrap schedule times, gain/ramp maths, rotation).
+- A debug way to jump near loop.endSec to audition the wrap.
+- A short summary of how it works and any engine limitations you had to work around.
+````
+
+## Code map
+
+- `src/components/GameSongScreen.tsx`, `GameSongWaveform.tsx` — the screen.
+- `src/gameSong/` — analysis worker and suggestions (`analyze.ts`), wrap timing and fade curves (`wrap.ts`), preview player (`player.ts`), ratings (`ratings.ts`), `song.json` (`songJson.ts`), export checks (`exportChecks.ts`), state and actions.
+- `server/` — dev-server plugin (`gameSongPlugin.ts`), Demucs split (`stems.ts`), export (`exportGameSong.ts`), ffmpeg helpers (`ffmpeg.ts`).
