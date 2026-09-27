@@ -4,7 +4,7 @@ import type { GameSongAnalysis, LoopSuggestion } from './analyze'
 import type { RatedJoin } from './ratings'
 import type { BlendChoice } from './wrap'
 
-const DEFAULT_GAME_FOLDER = '/Users/samenoka/projects/crypt-raiders/client/sfx/music/adaptive'
+const DEFAULT_GAME_FOLDER = ''
 const FOLDER_KEY = 'gameSong.destDir'
 const CALM_LEVEL_KEY = 'gameSong.calmLevel'
 /** Top-layer level in calm moments; the game fades it between this and 1 (`topLayerOff`). */

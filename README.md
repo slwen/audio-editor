@@ -37,7 +37,7 @@ Files the workflow creates in the repo:
 
 - `sample_songs/<song>` — imported source audio.
 - `analysis/<song>.layers/base.wav`, `top.wav` — stems (48 kHz stereo float, exactly the source length).
-- `game-song-ratings.jsonl` — Good/Bad wrap ratings.
+- `game-song-ratings.jsonl` — Good/Bad wrap ratings (gitignored).
 
 ## Workflow
 
@@ -70,7 +70,7 @@ Preview and export use the same wrap logic (`src/gameSong/wrap.ts`), so what you
 
 - **Song id** — lowercase letters, digits and dashes (`cathedral-of-iron`); used for file names.
 - **Title** — display name.
-- **Game music folder** — absolute path the files are copied into (remembered in the browser's localStorage; the default is set by `DEFAULT_GAME_FOLDER` in `src/gameSong/store.ts`). Leave empty and use **Download ZIP** instead.
+- **Game music folder** — absolute path the files are copied into (remembered in the browser's localStorage; empty by default). Leave empty and use **Download ZIP** instead.
 - **Cut the silence after the song ends** (default on) — trims to 1 s after the last sound, never before the loop's crossfade ends.
 - **Mono drums & bass** — smaller base file.
 - **Higher quality** — 128 kbps full band instead of 96 kbps with a 16 kHz cutoff.

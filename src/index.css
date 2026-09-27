@@ -751,8 +751,6 @@ body {
 .gs select:focus-visible, .gs-form input:focus-visible, .loop-toolbar select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .gs-done { margin-top: 12px; padding: 14px 16px; border: 1px solid var(--ui-border-strong); border-radius: 7px; background: var(--ui-surface-2); }
 .gs-done ul { margin: 4px 0 10px; padding-left: 18px; font-size: 13px; }
-.gs-next { display: flex; align-items: center; gap: 8px; }
-.gs-next code { font-size: 14px; }
 @media (max-width: 800px) {
   .gs { padding: 14px; }
   .gs-step__body { margin-left: 0; }

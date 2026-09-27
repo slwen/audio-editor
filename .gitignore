@@ -15,6 +15,7 @@ loop-ratings.jsonl
 transition-ratings.jsonl
 song-zones.json
 pack-ratings.jsonl
+game-song-ratings.jsonl
 sample_songs/
 analysis/
 

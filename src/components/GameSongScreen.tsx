@@ -267,9 +267,7 @@ function LoopStep({ state }: { state: StepState }) {
 
 function ExportStep({ state }: { state: StepState }) {
   const s = useGameSongStore()
-  const [copied, setCopied] = useState(false)
   const idOk = isSongId(s.id.trim())
-  const nextStep = `add adaptive song ${s.exported?.song.id ?? s.id}`
   return (
     <section className={`gs-step${state === 'locked' ? ' gs-step--locked' : ''}`}>
       <StepHeading n={4} title="Export to the game" state={state} />
@@ -325,13 +323,7 @@ function ExportStep({ state }: { state: StepState }) {
                   loudness {s.exported.song.loudness.integratedLufs} LUFS ({s.exported.song.loudness.gainDb > 0 ? '+' : ''}{s.exported.song.loudness.gainDb} dB)
                 </p>
                 {s.exported.notes.map(n => <p key={n} className="gs-muted">{n}</p>)}
-                <p><strong>Next step:</strong> in the crypt-raiders project, ask an agent:</p>
-                <div className="gs-next">
-                  <code>{nextStep}</code>
-                  <button type="button" className="btn btn--small" onClick={() => {
-                    void navigator.clipboard.writeText(nextStep).then(() => setCopied(true))
-                  }}><Copy size={14} /> {copied ? 'Copied' : 'Copy'}</button>
-                </div>
+                <p><strong>Next step:</strong> add <code>{s.exported.song.id}</code> to your game's song list (see the README's game integration prompt).</p>
               </div>
             )}
           </>
