@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getCachedBuffer } from '@/audio/bufferCache'
 import { getPeaks } from '@/lib/peaksCache'
+import { rulerStepSeconds } from '@/lib/rulerTicks'
 import { readCssColor, withAlpha } from '@/lib/themeCanvas'
 import { TIMELINE_PAD_L, TIMELINE_PAD_R } from '@/lib/timelineScroll'
 import { TRACK_ACCENT_HEXES } from '@/lib/trackAccent'
 import { filterLoopCandidates } from '@/loop/filters'
-import { exitLoopMode, rerunLoopAnalysis, selectLoopCandidate } from '@/loop/loopModeActions'
+import { selectLoopCandidate } from '@/loop/loopModeActions'
 import { useLoopStore } from '@/store/useLoopStore'
 import { useProjectStore } from '@/store/useProjectStore'
 
@@ -116,22 +117,29 @@ export function LoopTimeline() {
     if (bpm && beatOffsetSec != null) {
       const beat = 60 / bpm
       const bar = beat * 4
+      const minLabelGap = Math.max(48, ctx.measureText(String(Math.ceil(duration / bar))).width + 12)
+      let lastLabelX = -Infinity
       let t = beatOffsetSec
       if (t < t0) t += Math.floor((t0 - t) / beat) * beat
       for (; t <= t1 + 1e-6; t += beat) {
         const x = tx(t)
         const barI = Math.round((t - beatOffsetSec) / bar)
         const isBar = Math.abs((t - beatOffsetSec) / bar - barI) < 1e-3
+        if (!isBar && beat * pps < 8) continue
         ctx.strokeStyle = isBar ? css('--timeline-grid-strong', 'rgba(255,255,255,0.18)') : grid
         ctx.beginPath()
         ctx.moveTo(x, isBar ? 4 : 14)
         ctx.lineTo(x, RULER_H)
         ctx.stroke()
-        if (isBar && barI >= 0) ctx.fillText(String(barI + 1), x + 3, 12)
+        if (isBar && barI >= 0 && x - lastLabelX >= minLabelGap) {
+          ctx.fillText(String(barI + 1), x + 3, 12)
+          lastLabelX = x
+        }
       }
     } else {
-      const step = pps > 60 ? 1 : 2
-      const start = Math.floor(t0 / step) * step
+      const maxLabel = `${Math.ceil(t1 - trimStart)}s`
+      const step = rulerStepSeconds(pps, Math.max(48, ctx.measureText(maxLabel).width + 12))
+      const start = Math.ceil(Math.max(trimStart, t0) / step) * step
       for (let t = start; t <= t1; t += step) {
         const x = tx(t)
         ctx.fillText(`${(t - trimStart).toFixed(0)}s`, x + 2, 16)
@@ -303,15 +311,6 @@ export function LoopTimeline() {
 
   return (
     <div ref={wrapRef} className="timeline-wrap">
-      <div className="timeline-toolbar">
-        <span className="loop-mode-badge">Loop mode</span>
-        <button type="button" className="btn btn--small" onClick={() => rerunLoopAnalysis()}>
-          Analyze again
-        </button>
-        <button type="button" className="btn btn--small" onClick={() => exitLoopMode()}>
-          Exit
-        </button>
-      </div>
       <div ref={canvasAreaRef} className="timeline-canvas-area">
         <canvas
           ref={canvasRef}

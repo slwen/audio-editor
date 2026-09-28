@@ -225,7 +225,7 @@ export function selectLoopCandidate(id: string, opts?: { toggle?: boolean }): vo
   }
 }
 
-export async function startLoopPreview(candidateId?: string, mode: 'join' | 'full' = 'join'): Promise<void> {
+export async function startLoopPreview(candidateId?: string, mode: 'join' | 'full' = 'join', fromTime?: number): Promise<void> {
   await audioEngine.init()
   const st = useProjectStore.getState()
   const loop = useLoopStore.getState()
@@ -243,7 +243,9 @@ export async function startLoopPreview(candidateId?: string, mode: 'join' | 'ful
     }
   }
   const bpm = cand?.bpm ?? loop.bpm ?? 120
-  const from = mode === 'full' ? start : joinPreviewOffset(start, end, bpm)
+  const from = fromTime === undefined
+    ? (mode === 'full' ? start : joinPreviewOffset(start, end, bpm))
+    : Math.max(start, Math.min(end - 0.001, fromTime))
   st.setIsPlaying(true)
   st.setPlayhead(from)
   audioEngine.playLoopingRegion(

@@ -4,6 +4,10 @@ A local Vite + React tool that turns an ordinary song into looping, two-layer ga
 
 The app also still contains the original multitrack editor (**Edit**) and the **Find loops** workspace; the **Game song** button in the top bar opens the workflow described here.
 
+In **Edit**, use **Save project** to download an `.aeproj` file containing every timeline clip, its timing and settings, and the source audio. Use **Open project** to restore that file later, including on another browser or computer. Opening a project replaces the current timeline. The existing browser autosave still restores the last timeline when you return to the app.
+
+The **File** menu contains project and mix actions. Choose **Editor**, **Find loops**, or **Game song** in the mode selector. Keyboard shortcuts: **Space** plays or pauses, **S** splits at the playhead in Editor, **⌘←** returns to the start, **←/→** skips one second, and **Option+←/→** skips five seconds. Shortcuts leave text fields alone.
+
 ## Setup
 
 Requirements:

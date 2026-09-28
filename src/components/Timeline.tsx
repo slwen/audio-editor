@@ -1,9 +1,5 @@
-import { CopyPlus, Redo2, Trash2, Undo2 } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { getCachedBuffer } from '@/audio/bufferCache'
-import { audioExportFilename, exportMixedWav, type AudioExportFormat } from '@/audio/exportWav'
-import { ExportFormatToggle } from '@/components/ExportFormatToggle'
-import { downloadBlob } from '@/lib/downloadBlob'
 import { ingestAudioFiles } from '@/lib/ingestFiles'
 import {
   clipTimelineDuration,
@@ -14,11 +10,11 @@ import {
   sourceTimeAtTimelineTime,
 } from '@/lib/clipMath'
 import { getPeaks } from '@/lib/peaksCache'
+import { rulerStepSeconds } from '@/lib/rulerTicks'
 import { edgeSnapStart } from '@/lib/snap'
 import { readCssColor, withAlpha } from '@/lib/themeCanvas'
 import { maxTimelineScrollPx, scrollForPlayheadCentered, TIMELINE_PAD_L } from '@/lib/timelineScroll'
 import { clipAccentHex } from '@/lib/trackAccent'
-import { clearStoredProject } from '@/persistence/projectDb'
 import { seekToTimelineTime } from '@/playback/playbackActions'
 import { useProjectStore } from '@/store/useProjectStore'
 import type { Clip, ClipId } from '@/types'
@@ -83,8 +79,6 @@ function quantizeTimelineStep(t: number): number {
 }
 
 export function Timeline() {
-  const [exportFormat, setExportFormat] = useState<AudioExportFormat>('mp3')
-  const [exporting, setExporting] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasAreaRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -113,15 +107,7 @@ export function Timeline() {
   const setSelection = useProjectStore((s) => s.setSelection)
   const updateClip = useProjectStore((s) => s.updateClip)
   const pushUndo = useProjectStore((s) => s.pushUndo)
-  const resetProject = useProjectStore((s) => s.resetProject)
   const splitAt = useProjectStore((s) => s.splitAt)
-  const undo = useProjectStore((s) => s.undo)
-  const redo = useProjectStore((s) => s.redo)
-  const canUndo = useProjectStore((s) => s.undoStack.length > 0)
-  const canRedo = useProjectStore((s) => s.redoStack.length > 0)
-  const deleteSelected = useProjectStore((s) => s.deleteSelected)
-  const canDeleteSelection = useProjectStore((s) => s.selection.length > 0)
-  const duplicateSelected = useProjectStore((s) => s.duplicateSelected)
   const duplicateClipForDrag = useProjectStore((s) => s.duplicateClipForDrag)
 
   const clipsDrawOrder = useMemo(() => clipsSortedForDraw(clips), [clips])
@@ -206,7 +192,9 @@ export function Timeline() {
     const sec1 = Math.ceil(Math.max(t0, t1))
     ctx.fillStyle = css('--timeline-ruler-text', '#a0a0a8')
     ctx.font = '11px system-ui, sans-serif'
-    for (let s = sec0; s <= sec1; s++) {
+    const labelWidth = Math.max(ctx.measureText(`${sec0}s`).width, ctx.measureText(`${sec1}s`).width)
+    const step = rulerStepSeconds(pps, Math.max(48, labelWidth + 12))
+    for (let s = Math.ceil(Math.max(0, sec0) / step) * step; s <= sec1; s += step) {
       const x = tx(s)
       ctx.beginPath()
       ctx.moveTo(x, 0)
@@ -656,79 +644,6 @@ export function Timeline() {
         void ingestAudioFiles([...e.dataTransfer.files], true)
       }}
     >
-      <div className="timeline-toolbar">
-        <button
-          type="button"
-          className="btn btn--small"
-          onClick={() => {
-            pushUndo()
-            splitAt(playhead)
-          }}
-        >
-          Split at playhead
-        </button>
-        <button
-          type="button"
-          className="btn btn--small btn--icon"
-          disabled={!canUndo}
-          onClick={() => undo()}
-          aria-label="Undo"
-        >
-          <Undo2 size={18} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          className="btn btn--small btn--icon"
-          disabled={!canRedo}
-          onClick={() => redo()}
-          aria-label="Redo"
-        >
-          <Redo2 size={18} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          className="btn btn--small btn--icon"
-          disabled={!canDeleteSelection}
-          onClick={() => duplicateSelected()}
-          aria-label="Duplicate selection"
-        >
-          <CopyPlus size={18} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          className="btn btn--small btn--icon"
-          disabled={!canDeleteSelection}
-          onClick={() => deleteSelected()}
-          aria-label="Delete selection"
-        >
-          <Trash2 size={18} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          className="btn btn--small"
-          onClick={() => {
-            void clearStoredProject()
-            resetProject()
-          }}
-        >
-          New project
-        </button>
-        <button
-          type="button"
-          className="btn btn--small"
-          disabled={exporting}
-          onClick={() => {
-            const st = useProjectStore.getState()
-            setExporting(true)
-            void exportMixedWav(st.clips, st.masterGain, exportFormat)
-              .then((blob) => downloadBlob(blob, audioExportFilename('mixdown', exportFormat)))
-              .finally(() => setExporting(false))
-          }}
-        >
-          {exporting ? 'Exporting…' : 'Export mix'}
-        </button>
-        <ExportFormatToggle value={exportFormat} onChange={setExportFormat} />
-      </div>
       <div ref={canvasAreaRef} className="timeline-canvas-area">
         <canvas
           ref={canvasRef}

@@ -8,13 +8,14 @@ import { LoopTimeline } from '@/components/LoopTimeline'
 import { Timeline } from '@/components/Timeline'
 import { TransportBar } from '@/components/TransportBar'
 import { ingestAudioFiles } from '@/lib/ingestFiles'
-import { skipToStart, togglePlayback } from '@/playback/playbackActions'
+import { splitAtPlayhead } from '@/lib/editorActions'
+import { seekRelative, skipToStart, togglePlayback } from '@/playback/playbackActions'
 import { useProjectPersistence } from '@/persistence/useProjectPersistence'
 import { useProjectStore } from '@/store/useProjectStore'
 
 export default function App() {
   const editorMode = useProjectStore((s) => s.editorMode)
-  useProjectPersistence()
+  const projectReady = useProjectPersistence()
 
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
@@ -22,6 +23,7 @@ export default function App() {
     }
     const onDrop = (e: DragEvent) => {
       e.preventDefault()
+      if (!projectReady) return
       const mode = useProjectStore.getState().editorMode
       if (mode === 'loop') return
       const files = [...(e.dataTransfer?.files ?? [])]
@@ -39,7 +41,7 @@ export default function App() {
       window.removeEventListener('dragover', onDragOver)
       window.removeEventListener('drop', onDrop)
     }
-  }, [])
+  }, [projectReady])
 
   useEffect(() => {
     void audioEngine.init().then((ctx) => {
@@ -64,19 +66,29 @@ export default function App() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return
-      if (e.code === 'Space' && e.target instanceof HTMLElement && e.target.closest('button')) return
       const looped = useProjectStore.getState().editorMode !== 'edit'
       if (e.code === 'Space') {
         e.preventDefault()
-        void togglePlayback()
+        e.stopPropagation()
+        if (!e.repeat) void togglePlayback()
         return
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowLeft') {
+      if ((e.metaKey || e.ctrlKey) && e.code === 'ArrowLeft') {
         e.preventDefault()
         skipToStart()
         return
       }
+      if (!e.metaKey && !e.ctrlKey && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+        e.preventDefault()
+        seekRelative((e.code === 'ArrowRight' ? 1 : -1) * (e.altKey ? 5 : 1))
+        return
+      }
       if (looped) return
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && e.code === 'KeyS') {
+        e.preventDefault()
+        if (!e.repeat) splitAtPlayhead()
+        return
+      }
       if (e.metaKey || e.ctrlKey) {
         if (e.code === 'KeyZ') {
           e.preventDefault()
@@ -108,9 +120,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <TransportBar />
+      <TransportBar projectReady={projectReady} />
       <main className="app__main">
-        {editorMode === 'game-song' ? <GameSongScreen /> : editorMode === 'loop' ? (
+        {!projectReady ? <p className="project-loading">Loading project…</p> :
+        editorMode === 'game-song' ? <GameSongScreen /> : editorMode === 'loop' ? (
           <>
             <LoopTimeline />
             <LoopInspector />

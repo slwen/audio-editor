@@ -17,6 +17,7 @@ export function ExportFormatToggle({
           type="button"
           className={`btn btn--small btn--segment${value === format ? ' btn--segment-active' : ''}`}
           aria-pressed={value === format}
+          aria-label={`${format.toUpperCase()} export format`}
           onClick={() => onChange(format)}
         >
           {format.toUpperCase()}

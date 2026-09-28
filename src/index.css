@@ -124,25 +124,68 @@ body {
 }
 
 .transport {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
   background: var(--ui-surface);
   border-bottom: 1px solid var(--ui-border-subtle);
   flex-shrink: 0;
+}
+
+.transport__top,
+.transport__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.35rem 0.7rem;
+}
+
+.transport__toolbar {
+  background: var(--ui-elevated);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.transport__toolbar-separator {
+  width: 1px;
+  height: 23px;
+  margin: 0 0.15rem;
+  background: var(--ui-border);
 }
 
 .transport__brand {
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--ui-text);
+  margin-right: 0.35rem;
 }
 
-.transport__controls {
+.transport__modes {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  margin-left: 0.25rem;
+}
+
+.transport__modes .btn {
+  border-radius: 0;
+  margin-left: -1px;
+  padding: 0 0.65rem;
+}
+
+.transport__modes .btn:first-child {
+  margin-left: 0;
+  border-radius: 6px 0 0 6px;
+}
+
+.transport__modes .btn:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.transport__mode--active,
+.transport__mode--active:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  z-index: 1;
 }
 
 .transport__time {
@@ -156,6 +199,90 @@ body {
   color: var(--ui-muted);
 }
 
+.transport__project-message {
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+  margin-left: 0.35rem;
+}
+
+.file-menu {
+  position: relative;
+  z-index: 20;
+}
+
+.file-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+.file-menu__trigger svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.file-menu__trigger::-webkit-details-marker {
+  display: none;
+}
+
+.file-menu__panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 205px;
+  padding: 0.3rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 7px;
+  background: var(--ui-surface-2);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.file-menu__panel > button {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text);
+  text-align: left;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.file-menu__panel > button:hover:not(:disabled),
+.file-menu__panel > button:focus-visible {
+  background: var(--ui-control-hover);
+}
+
+.file-menu__panel > button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.file-menu__separator {
+  height: 1px;
+  margin: 0.3rem 0.45rem;
+  background: var(--ui-border);
+}
+
+.file-menu__format {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem 0.2rem;
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+
+.project-loading {
+  margin: 1rem;
+  color: var(--ui-muted);
+}
+
 .timeline-wrap {
   flex: 1;
   display: flex;
@@ -163,17 +290,6 @@ body {
   min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--ui-border-subtle);
-}
-
-.timeline-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  background: var(--ui-elevated);
-  border-bottom: 1px solid var(--ui-border-subtle);
-  flex-shrink: 0;
 }
 
 .timeline-canvas-area {
@@ -517,23 +633,6 @@ body {
   font-weight: 600;
 }
 
-.loop-mode-badge {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ui-muted);
-  border: 1px solid var(--ui-border-subtle);
-  border-radius: 999px;
-  padding: 0.15rem 0.55rem;
-}
-
-.loop-mode-badge--on {
-  color: var(--on-accent);
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
 .loop-candidate-list {
   display: flex;
   flex-direction: column;
@@ -755,5 +854,5 @@ body {
   .gs { padding: 14px; }
   .gs-step__body { margin-left: 0; }
   .gs-form { grid-template-columns: 1fr; }
-  .transport { flex-wrap: wrap; gap: 8px; }
+  .transport__top { gap: 0.4rem; }
 }
