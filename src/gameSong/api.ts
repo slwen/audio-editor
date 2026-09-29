@@ -12,6 +12,8 @@ export type StemStatus = {
   message: string
   demucsInstalled: boolean
   installCommand: string
+  /** Changes whenever either ready stem changes. */
+  version?: string
 }
 
 export type SongListing = { name: string; stems: boolean }

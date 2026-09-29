@@ -61,6 +61,7 @@ export default function App() {
       if (!(el instanceof HTMLElement)) return false
       const tag = el.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+      if (el.closest('[role="slider"]')) return true
       return el.isContentEditable
     }
 

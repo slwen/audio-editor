@@ -1,4 +1,4 @@
-import { extractMonoForAnalysis } from '@/loop/detectLoops'
+import { prepareAnalysis } from '@/loop/prepareAnalysis'
 import type { GameSongAnalysis, LoopSuggestion } from './analyze'
 import type { AnalysisRequest, AnalysisResponse } from './analysisMessages'
 import type { RatedJoin } from './ratings'
@@ -8,6 +8,15 @@ type Pending = { resolve: (msg: AnalysisResponse) => void; reject: (error: Error
 let worker: Worker | null = null
 let nextId = 0
 const pending = new Map<number, Pending>()
+let cached: { key: string; analysis: GameSongAnalysis; suggestions: LoopSuggestion[]; priorsKey: string } | null = null
+
+export function cancelStemAnalysis(): void {
+  worker?.terminate()
+  worker = null
+  cached = null
+  for (const p of pending.values()) p.reject(new DOMException('Stem analysis cancelled', 'AbortError'))
+  pending.clear()
+}
 
 function ensureWorker(): Worker {
   if (worker) return worker
@@ -22,6 +31,9 @@ function ensureWorker(): Worker {
   w.onerror = ev => {
     for (const p of pending.values()) p.reject(ev.error instanceof Error ? ev.error : new Error('Analysis worker failed'))
     pending.clear()
+    w.terminate()
+    if (worker === w) worker = null
+    cached = null
   }
   worker = w
   return w
@@ -35,23 +47,30 @@ function send(request: AnalysisRequest, transfer: Transferable[] = []): Promise<
   })
 }
 
-function channelsOf(buffer: AudioBuffer): Float32Array[] {
-  return Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))
-}
-
-export async function analyzeStems(base: AudioBuffer, top: AudioBuffer, priors: RatedJoin[]):
+export async function analyzeStems(base: AudioBuffer, top: AudioBuffer, priors: RatedJoin[], signal?: AbortSignal, key?: string):
   Promise<{ analysis: GameSongAnalysis; suggestions: LoopSuggestion[] }> {
-  const b = extractMonoForAnalysis(channelsOf(base), base.sampleRate)
-  const t = extractMonoForAnalysis(channelsOf(top), top.sampleRate)
+  signal?.throwIfAborted()
+  if (key && cached?.key === key && worker) {
+    const analysis = cached.analysis
+    const suggestions = cached.priorsKey === JSON.stringify(priors) ? cached.suggestions : await rerankSuggestions(priors)
+    signal?.throwIfAborted()
+    return { analysis, suggestions }
+  }
+  cached = null
+  const b = await prepareAnalysis(base, 0, base.duration, signal)
+  const t = await prepareAnalysis(top, 0, top.duration, signal)
   const msg = await send({ kind: 'analyze', id: ++nextId, base: b.samples, top: t.samples, sampleRate: b.sampleRate, priors },
     [b.samples.buffer, t.samples.buffer])
   if (msg.kind !== 'analyzed') throw new Error('Unexpected analysis reply')
+  signal?.throwIfAborted()
+  if (key) cached = { key, analysis: msg.analysis, suggestions: msg.suggestions, priorsKey: JSON.stringify(priors) }
   return { analysis: msg.analysis, suggestions: msg.suggestions }
 }
 
 export async function rerankSuggestions(priors: RatedJoin[]): Promise<LoopSuggestion[]> {
   const msg = await send({ kind: 'rank', id: ++nextId, priors })
   if (msg.kind !== 'ranked') throw new Error('Unexpected ranking reply')
+  if (cached) cached = { ...cached, suggestions: msg.suggestions, priorsKey: JSON.stringify(priors) }
   return msg.suggestions
 }
 

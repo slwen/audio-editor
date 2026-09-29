@@ -18,3 +18,7 @@ export function removePeaks(id: BufferId): void {
 export function clearPeaks(): void {
   peaks.clear()
 }
+
+export function retainPeaks(ids: Set<BufferId>): void {
+  for (const id of peaks.keys()) if (!ids.has(id)) peaks.delete(id)
+}

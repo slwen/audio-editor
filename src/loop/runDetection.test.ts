@@ -19,6 +19,7 @@ afterEach(() => { terminateAnalysisWorker(); vi.unstubAllGlobals() })
 
 it('keeps source-relative trim coordinates and routes each edit response to its caller', async () => {
   const detection = analyzeBufferInWorker(buffer, 1, 9, 1.5, 120)
+  await vi.waitFor(() => expect(WorkerStub.instances[0]?.postMessage).toHaveBeenCalled())
   const worker = WorkerStub.instances[0]!
   const payload = worker.postMessage.mock.calls[0]![0]
   expect(payload.sampleRate).toBe(24000)
@@ -37,12 +38,14 @@ it('keeps source-relative trim coordinates and routes each edit response to its 
 it('settles cancelled analysis and edits instead of leaving promises pending or accepting stale sources', async () => {
   const first = analyzeBufferInWorker(buffer, 0, 9)
   const firstCheck = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+  await vi.waitFor(() => expect(WorkerStub.instances[0]?.postMessage).toHaveBeenCalled())
   const oldWorker = WorkerStub.instances[0]!
   const oldRequest = oldWorker.postMessage.mock.calls[0]![0]
   const next = analyzeBufferInWorker(buffer, 1, 9)
   await firstCheck
   oldWorker.emit({ requestId: oldRequest.requestId, ok: true, result })
   await expect(rescoreBufferInWorker(buffer, 0, 9, 2, 6, 120, 1.5)).rejects.toThrow('Find loops again')
+  await vi.waitFor(() => expect(WorkerStub.instances[1]?.postMessage).toHaveBeenCalled())
   const worker = WorkerStub.instances[1]!
   worker.emit({ requestId: worker.postMessage.mock.calls[0]![0].requestId, ok: true, result })
   await next
@@ -51,4 +54,12 @@ it('settles cancelled analysis and edits instead of leaving promises pending or 
   terminateAnalysisWorker()
   await editCheck
   expect(oldWorker.terminate).toHaveBeenCalledOnce()
+})
+
+it('cancels preparation before a worker is allocated', async () => {
+  const detection = analyzeBufferInWorker(buffer, 0, 9)
+  const check = expect(detection).rejects.toMatchObject({ name: 'AbortError' })
+  terminateAnalysisWorker()
+  await check
+  expect(WorkerStub.instances).toHaveLength(0)
 })

@@ -52,7 +52,13 @@ export function gameSongPlugin(root: string): Plugin {
     const job = jobs.get(name)
     const common = { demucsInstalled: demucsInstalled(), installCommand: DEMUCS_INSTALL }
     if (job?.state === 'running') return { ...common, state: 'running', progress: job.progress, message: job.message }
-    if (stemsReady(path.join(songsDir, name), layersDir(name))) return { ...common, state: 'ready', progress: 1, message: 'Stems ready' }
+    if (stemsReady(path.join(songsDir, name), layersDir(name))) {
+      const version = Object.values(stemFiles(layersDir(name))).map(file => {
+        const stat = fs.statSync(file)
+        return `${stat.size}-${stat.mtimeMs}`
+      }).join('_')
+      return { ...common, state: 'ready', progress: 1, message: 'Stems ready', version }
+    }
     if (job?.state === 'error') return { ...common, state: 'error', progress: 0, message: job.message }
     return { ...common, state: 'missing', progress: 0, message: 'Not split yet' }
   }
@@ -111,10 +117,22 @@ export function gameSongPlugin(root: string): Plugin {
               if (!source || (stem !== 'base' && stem !== 'top')) { sendJson(res, { error: 'Unknown stem' }, 400); return }
               const file = stemFiles(layersDir(source))[stem]
               if (!fs.existsSync(file)) { sendJson(res, { error: 'Stems not split yet' }, 404); return }
+              const stat = fs.statSync(file)
+              const etag = `W/"${stat.size}-${stat.mtimeMs}"`
               res.setHeader('Content-Type', 'audio/wav')
-              res.setHeader('Content-Length', String(fs.statSync(file).size))
-              res.setHeader('Cache-Control', 'no-store')
-              fs.createReadStream(file).pipe(res)
+              res.setHeader('Cache-Control', 'private, no-cache')
+              res.setHeader('ETag', etag)
+              res.setHeader('Last-Modified', stat.mtime.toUTCString())
+              if (req.headers['if-none-match']?.split(',').map(value => value.trim()).includes(etag)) {
+                res.statusCode = 304
+                res.end()
+                return
+              }
+              res.setHeader('Content-Length', String(stat.size))
+              const stream = fs.createReadStream(file)
+              res.on('close', () => stream.destroy())
+              stream.on('error', () => res.destroy())
+              stream.pipe(res)
               return
             }
             case 'GET /ratings': {

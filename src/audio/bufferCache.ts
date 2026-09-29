@@ -17,3 +17,7 @@ export function removeCachedBuffer(id: BufferId): void {
 export function clearBufferCache(): void {
   buffers.clear()
 }
+
+export function retainBuffers(ids: Set<BufferId>): void {
+  for (const id of buffers.keys()) if (!ids.has(id)) buffers.delete(id)
+}

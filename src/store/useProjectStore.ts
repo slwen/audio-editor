@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { audioEngine } from '@/audio/AudioEngine'
-import { cacheBuffer, clearBufferCache, removeCachedBuffer } from '@/audio/bufferCache'
+import { cacheBuffer, clearBufferCache, retainBuffers } from '@/audio/bufferCache'
 import {
   clampFadeSeconds,
   clampLinearGain,
@@ -8,7 +8,7 @@ import {
   clipTimelineDuration,
   clipTimelineEnd,
 } from '@/lib/clipMath'
-import { clearPeaks, removePeaks, setPeaksForBuffer } from '@/lib/peaksCache'
+import { clearPeaks, retainPeaks, setPeaksForBuffer } from '@/lib/peaksCache'
 import { planLayeredTimeline, type StemKind } from '@/editor/layerPlan'
 import {
   pickRandomAccentAvoiding,
@@ -16,7 +16,7 @@ import {
   pickTwoDistinctTrackAccents,
   stableAccentForClipId,
 } from '@/lib/trackAccent'
-import { clearOriginalBytes, rememberOriginalBytes } from '@/persistence/fileBytes'
+import { clearOriginalBytes, rememberOriginalBytes, retainOriginalBytes } from '@/persistence/fileBytes'
 import type { BufferId, BufferMeta, Clip, ClipId, EditorMode, ProjectSnapshot } from '@/types'
 
 const MAX_UNDO = 50
@@ -163,7 +163,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
   setIsPlaying: (v) => set({ isPlaying: v }),
   setMasterGain: (g) => set({ masterGain: clampLinearGain(g) }),
   setPixelsPerSecond: (pps) => set({ pixelsPerSecond: Math.max(10, Math.min(500, pps)) }),
-  setScrollX: (x) => set({ scrollX: Math.max(0, x) }),
+  setScrollX: (x) => { const next = Math.max(0, x); if (next !== get().scrollX) set({ scrollX: next }) },
 
   selectOnly: (id) => set({ selection: id ? [id] : [] }),
   toggleSelect: (id) =>
@@ -262,8 +262,6 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
       if (!clip) return { clips, selection }
       const stillUsed = clips.some((c) => c.bufferId === clip.bufferId)
       if (!stillUsed) {
-        removeCachedBuffer(clip.bufferId)
-        removePeaks(clip.bufferId)
         return {
           clips,
           bufferMeta: s.bufferMeta.filter((b) => b.id !== clip.bufferId),
@@ -487,3 +485,17 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
       }
     }),
 }))
+
+// History owns audio as well as metadata: undo must restore playable clips.
+useProjectStore.subscribe((state, previous) => {
+  if (state.clips === previous.clips && state.bufferMeta === previous.bufferMeta &&
+      state.undoStack === previous.undoStack && state.redoStack === previous.redoStack) return
+  const ids = new Set<BufferId>()
+  for (const snapshot of [state, ...state.undoStack, ...state.redoStack]) {
+    for (const clip of snapshot.clips) ids.add(clip.bufferId)
+    for (const meta of snapshot.bufferMeta) ids.add(meta.id)
+  }
+  retainBuffers(ids)
+  retainPeaks(ids)
+  retainOriginalBytes(ids)
+})

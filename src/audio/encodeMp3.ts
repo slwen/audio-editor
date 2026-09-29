@@ -12,23 +12,36 @@ function floatToPcm16(input: Float32Array): Int16Array {
   return out
 }
 
-/** Stereo or mono MP3 from an AudioBuffer (typically 48 kHz / 128 kbps). */
+/** Used in the export worker. Chunks end on MPEG frame boundaries. */
+export function createMp3Encoder(channels: number, sampleRate: number, bitrateKbps = DEFAULT_BITRATE_KBPS) {
+  const encoder = new Mp3Encoder(channels, sampleRate, bitrateKbps)
+  const parts: BlobPart[] = []
+  return {
+    append(leftSamples: Float32Array, rightSamples?: Float32Array): void {
+      const left = floatToPcm16(leftSamples)
+      const right = rightSamples ? floatToPcm16(rightSamples) : undefined
+      for (let i = 0; i < left.length; i += FRAME) {
+        const end = Math.min(i + FRAME, left.length)
+        const l = left.subarray(i, end)
+        const encoded = channels === 1 || !right
+          ? encoder.encodeBuffer(l) : encoder.encodeBuffer(l, right.subarray(i, end))
+        if (encoded.length > 0) parts.push(copyBytes(encoded))
+      }
+    },
+    finish(): Blob {
+      const tail = encoder.flush()
+      if (tail.length > 0) parts.push(copyBytes(tail))
+      return new Blob(parts, { type: 'audio/mpeg' })
+    },
+  }
+}
+
+/** Synchronous codec entry for tests; the app invokes it in a worker. */
 export function encodeMp3(buffer: AudioBuffer, bitrateKbps = DEFAULT_BITRATE_KBPS): Blob {
   const channels = Math.min(2, Math.max(1, buffer.numberOfChannels))
-  const encoder = new Mp3Encoder(channels, buffer.sampleRate, bitrateKbps)
-  const left = floatToPcm16(buffer.getChannelData(0))
-  const right = channels > 1 ? floatToPcm16(buffer.getChannelData(1)) : undefined
-  const parts: BlobPart[] = []
-  for (let i = 0; i < left.length; i += FRAME) {
-    const end = Math.min(i + FRAME, left.length)
-    const l = new Int16Array(left.subarray(i, end))
-    const encoded =
-      channels === 1 || !right ? encoder.encodeBuffer(l) : encoder.encodeBuffer(l, new Int16Array(right.subarray(i, end)))
-    if (encoded.length > 0) parts.push(copyBytes(encoded))
-  }
-  const tail = encoder.flush()
-  if (tail.length > 0) parts.push(copyBytes(tail))
-  return new Blob(parts, { type: 'audio/mpeg' })
+  const encoder = createMp3Encoder(channels, buffer.sampleRate, bitrateKbps)
+  encoder.append(buffer.getChannelData(0), channels > 1 ? buffer.getChannelData(1) : undefined)
+  return encoder.finish()
 }
 
 function copyBytes(src: Uint8Array): Uint8Array<ArrayBuffer> {

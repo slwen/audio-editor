@@ -1,10 +1,10 @@
 import { audioEngine } from '@/audio/AudioEngine'
 import { downloadBlob } from '@/lib/downloadBlob'
-import { peaksForBuffer } from '@/lib/peaks'
+import { peaksForBufferAsync } from '@/lib/peaks'
 import { createLoopArchive } from '@/loop/loopArchive'
 import { getOriginalBytes } from '@/persistence/fileBytes'
 import { useProjectStore } from '@/store/useProjectStore'
-import { analyzeStems, rerankSuggestions, scoreWrap } from './analysisClient'
+import { analyzeStems, cancelStemAnalysis, rerankSuggestions, scoreWrap } from './analysisClient'
 import { priorFor, snapToGrid, stepOnGrid, type LoopSuggestion } from './analyze'
 import type { ExportRequest, ExportResult, RatingsResponse, SongListing, StemStatus } from './api'
 import { GameSongPlayer } from './player'
@@ -32,6 +32,18 @@ let fadeTimer: ReturnType<typeof setTimeout> | null = null
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 let loadGen = 0
 let scoreGen = 0
+let loadController: AbortController | null = null
+// One recent decoded pair, capped at 192 MiB, including its small peak arrays.
+let cachedStems: { key: string; base: AudioBuffer; top: AudioBuffer; peaks: { base: Float32Array; top: Float32Array } } | null = null
+const STEM_CACHE_BYTES = 192 * 1024 * 1024
+
+function cancelStemLoad(): void {
+  loadController?.abort()
+  loadController = null
+  loadGen++
+  scoreGen++
+  if (get().loading === 'loading' || get().loading === 'analyzing') cancelStemAnalysis()
+}
 
 const set = (patch: Partial<GameSongState>) => useGameSongStore.setState(patch)
 const get = () => useGameSongStore.getState()
@@ -78,6 +90,8 @@ export function enterGameSongMode(): void {
 
 export function exitGameSongMode(): void {
   stopGameSong()
+  cancelStemLoad()
+  if (get().loading === 'loading' || get().loading === 'analyzing') set({ loading: 'idle' })
   if (pollTimer) clearTimeout(pollTimer)
   pollTimer = null
   useProjectStore.getState().setEditorMode('edit')
@@ -129,7 +143,7 @@ export async function importFromEditor(): Promise<void> {
 export async function selectSong(name: string): Promise<void> {
   stopGameSong()
   stems = null
-  loadGen++
+  cancelStemLoad()
   if (pollTimer) clearTimeout(pollTimer)
   pollTimer = null
   set({ ...initialSongState(), sourceName: name, id: songIdFromName(name), title: titleFromName(name) })
@@ -140,10 +154,11 @@ export async function selectSong(name: string): Promise<void> {
 
 async function refreshStemStatus(): Promise<void> {
   const name = get().sourceName
+  const gen = loadGen
   if (!name) return
   try {
     const status = await api<StemStatus>(`/status?source=${encodeURIComponent(name)}`)
-    if (get().sourceName !== name) return
+    if (gen !== loadGen || get().sourceName !== name) return
     set({ stems: status })
     if (status.state === 'running') pollTimer = setTimeout(() => void refreshStemStatus(), 1000)
     else if (status.state === 'ready' && get().loading === 'idle') {
@@ -151,6 +166,7 @@ async function refreshStemStatus(): Promise<void> {
       await loadStems()
     }
   } catch (err) {
+    if (gen !== loadGen) return
     set({ stems: { state: 'error', progress: 0, message: err instanceof Error ? err.message : 'Dev server unavailable',
       demucsInstalled: true, installCommand: '' } })
   }
@@ -170,9 +186,9 @@ export async function startSplit(): Promise<void> {
 
 // ---- Step 3: pick the loop ----
 
-async function fetchRatings(name: string): Promise<RatingsResponse> {
+async function fetchRatings(name: string, signal?: AbortSignal): Promise<RatingsResponse> {
   try {
-    return await api<RatingsResponse>(`/ratings?source=${encodeURIComponent(name)}`)
+    return await api<RatingsResponse>(`/ratings?source=${encodeURIComponent(name)}`, { signal })
   } catch {
     return { current: [], all: [] }
   }
@@ -182,20 +198,36 @@ async function loadStems(): Promise<void> {
   const name = get().sourceName
   if (!name) return
   const gen = ++loadGen
+  const controller = new AbortController()
+  loadController?.abort()
+  loadController = controller
+  const signal = controller.signal
+  const key = `${name}:${get().stems?.version ?? ''}`
   set({ loading: 'loading', loadError: null })
   try {
     const ctx = await audioEngine.init()
+    signal.throwIfAborted()
+    const cached = cachedStems?.key === key ? cachedStems : null
+    if (!cached) { cachedStems = null; cancelStemAnalysis() }
     const decode = async (stem: 'base' | 'top') => {
-      const res = await fetch(`${API}/stem?source=${encodeURIComponent(name)}&stem=${stem}`)
+      const res = await fetch(`${API}/stem?source=${encodeURIComponent(name)}&stem=${stem}`, { signal })
       if (!res.ok) throw new Error('Could not load the stems')
-      return ctx.decodeAudioData(await res.arrayBuffer())
+      const bytes = await res.arrayBuffer()
+      signal.throwIfAborted()
+      const buffer = await ctx.decodeAudioData(bytes)
+      signal.throwIfAborted()
+      return buffer
     }
-    const [base, top, ratings] = await Promise.all([decode('base'), decode('top'), fetchRatings(name)])
+    const [base, top, ratings] = await Promise.all([cached?.base ?? decode('base'), cached?.top ?? decode('top'), fetchRatings(name, signal)])
     if (gen !== loadGen) return
     stems = { base, top }
-    set({ loading: 'analyzing', peaks: { base: peaksForBuffer(base, 3000), top: peaksForBuffer(top, 3000) },
+    const peaks = cached?.peaks ?? { base: await peaksForBufferAsync(base, 3000, signal), top: await peaksForBufferAsync(top, 3000, signal) }
+    signal.throwIfAborted()
+    const bytes = (base.length * base.numberOfChannels + top.length * top.numberOfChannels) * 4 + peaks.base.byteLength + peaks.top.byteLength
+    if (bytes <= STEM_CACHE_BYTES) cachedStems = { key, base, top, peaks }
+    set({ loading: 'analyzing', peaks,
       ratings: ratings.all, myRatings: ratings.current })
-    const { analysis, suggestions } = await analyzeStems(base, top, ratings.all)
+    const { analysis, suggestions } = await analyzeStems(base, top, ratings.all, signal, key)
     if (gen !== loadGen) return
     const saved = savedLoop(name)
     const first = suggestions[0]
@@ -207,7 +239,12 @@ async function loadStems(): Promise<void> {
     void refreshScore()
   } catch (err) {
     if (gen !== loadGen) return
+    controller.abort()
+    cancelStemAnalysis()
+    stems = null
     set({ loading: 'error', loadError: err instanceof Error ? err.message : 'Could not load the stems' })
+  } finally {
+    if (loadController === controller) loadController = null
   }
 }
 
@@ -244,6 +281,17 @@ export function nudgeMarker(which: 'start' | 'end', steps: number): void {
   if (!analysis) return
   const t = stepOnGrid(analysis, which === 'start' ? loop.startSec : loop.endSec, snap, steps)
   setMarker(which, t)
+}
+
+export function moveMarkerToBoundary(which: 'start' | 'end', last: boolean): void {
+  const { analysis, snap, loop } = get()
+  if (!analysis) return
+  const grid = snap === 'bar' ? analysis.bars.map(bar => bar.startSec) : analysis.beatsSec
+  const valid = grid.filter(time => time >= 0 && time <= analysis.durationSec &&
+    (which === 'start' ? time <= loop.endSec - 1 : time >= loop.startSec + 1))
+  const fallback = which === 'start' ? (last ? Math.max(0, loop.endSec - 1) : 0)
+    : (last ? analysis.durationSec : Math.min(analysis.durationSec, loop.startSec + 1))
+  setMarker(which, valid.length ? valid[last ? valid.length - 1 : 0]! : fallback)
 }
 
 export function chooseSuggestion(index: number): void {

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { encodeMp3 } from './encodeMp3'
+import { createMp3Encoder, encodeMp3 } from './encodeMp3'
 import { writeWavStereo16 } from './wavBytes'
 
 function sineBuffer(seconds: number, sampleRate = 48000): AudioBuffer {
@@ -28,4 +28,15 @@ it('encodes a stereo buffer as MPEG that is much smaller than WAV', async () => 
   expect(mp3Bytes[0]).toBe(0xff)
   expect((mp3Bytes[1] ?? 0) & 0xe0).toBe(0xe0)
   expect(mp3Bytes.byteLength).toBeLessThan(wavBytes.byteLength / 4)
+})
+
+it('produces identical MPEG bytes from bounded, frame-aligned stereo chunks', async () => {
+  const buffer = sineBuffer(2)
+  const stream = createMp3Encoder(2, buffer.sampleRate)
+  const left = buffer.getChannelData(0)
+  const right = buffer.getChannelData(1)
+  for (let offset = 0; offset < buffer.length; offset += 1152 * 32) {
+    stream.append(left.subarray(offset, offset + 1152 * 32), right.subarray(offset, offset + 1152 * 32))
+  }
+  expect(new Uint8Array(await stream.finish().arrayBuffer())).toEqual(new Uint8Array(await encodeMp3(buffer).arrayBuffer()))
 })

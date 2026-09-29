@@ -1,10 +1,11 @@
-import { extractMonoForAnalysis } from '@/loop/detectLoops'
+import { prepareAnalysis } from '@/loop/prepareAnalysis'
 import type { DetectLoopsResult, DetectWorkerRequest, DetectWorkerResponse, LoopScores, RescoreWorkerRequest, RescoreWorkerResponse } from '@/loop/types'
 
 let worker: Worker | null = null
 let requestId = 0
 let source: { buffer: AudioBuffer; trimStart: number; trimEnd: number; requestId: number } | null = null
 let rejectDetection: ((error: Error) => void) | null = null
+let preparation: AbortController | null = null
 const pendingScores = new Map<number, { resolve: (scores: LoopScores) => void; reject: (error: Error) => void }>()
 
 function rejectPending(error: Error): void {
@@ -15,24 +16,15 @@ function rejectPending(error: Error): void {
 }
 
 export function terminateAnalysisWorker(): void {
+  preparation?.abort()
+  preparation = null
   worker?.terminate()
   worker = null
   source = null
   rejectPending(new DOMException('Loop analysis cancelled', 'AbortError'))
 }
 
-function sliceTrimChannels(buffer: AudioBuffer, trimStart: number, trimEnd: number): Float32Array[] {
-  const sr = buffer.sampleRate
-  const a = Math.max(0, Math.floor(trimStart * sr))
-  const b = Math.min(buffer.length, Math.max(a + 1, Math.floor(trimEnd * sr)))
-  const out: Float32Array[] = []
-  for (let c = 0; c < buffer.numberOfChannels; c++) {
-    out.push(buffer.getChannelData(c).slice(a, b))
-  }
-  return out
-}
-
-export function analyzeBufferInWorker(
+export async function analyzeBufferInWorker(
   buffer: AudioBuffer,
   trimStart: number,
   trimEnd: number,
@@ -40,8 +32,10 @@ export function analyzeBufferInWorker(
   bpmOverride?: number
 ): Promise<DetectLoopsResult> {
   terminateAnalysisWorker()
-  const channels = sliceTrimChannels(buffer, trimStart, trimEnd)
-  const prepared = extractMonoForAnalysis(channels, buffer.sampleRate)
+  const controller = new AbortController()
+  preparation = controller
+  const prepared = await prepareAnalysis(buffer, trimStart, trimEnd, controller.signal)
+  preparation = null
   const id = ++requestId
   const w = new Worker(new URL('./detectLoops.worker.ts', import.meta.url), { type: 'module' })
   worker = w

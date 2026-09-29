@@ -1,5 +1,5 @@
 import { CopyPlus, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { audioEngine } from '@/audio/AudioEngine'
 import {
   audioExportFilename,
@@ -56,6 +56,10 @@ export function Inspector() {
   const isPlaying = useProjectStore((s) => s.isPlaying)
   const [exportFormat, setExportFormat] = useState<AudioExportFormat>('mp3')
   const [exporting, setExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState<number | null>(null)
+  const [exportError, setExportError] = useState('')
+  const exportController = useRef<AbortController | null>(null)
+  useEffect(() => () => exportController.current?.abort(), [])
   const [splitting, setSplitting] = useState<LayerLayout | null>(null)
   const [splitQuality, setSplitQuality] = useState<LayerSplitQuality>('high')
   const [splitProgress, setSplitProgress] = useState<LayerSplitProgress | null>(null)
@@ -158,15 +162,22 @@ export function Inspector() {
               disabled={exporting}
               onClick={() => {
                 setExporting(true)
-                void exportSelectedWav(selected, masterGain, exportFormat)
+                setExportError('')
+                setExportProgress(null)
+                const controller = new AbortController()
+                exportController.current = controller
+                void exportSelectedWav(selected, masterGain, exportFormat, { signal: controller.signal, onProgress: setExportProgress })
                   .then((blob) =>
                     downloadBlob(blob, audioExportFilename(`selection-${selected.length}-clips`, exportFormat))
                   )
-                  .finally(() => setExporting(false))
+                  .catch(error => setExportError(error instanceof Error ? error.message : 'Export failed'))
+                  .finally(() => { exportController.current = null; setExporting(false) })
               }}
             >
-              {exporting ? 'Exporting…' : `Export ${selected.length} selected`}
+              {exporting ? `Exporting…${exportProgress === null ? '' : ` ${Math.round(exportProgress * 100)}%`}` : `Export ${selected.length} selected`}
             </button>
+            {exporting && <button type="button" className="btn btn--small" onClick={() => exportController.current?.abort()}>Cancel export</button>}
+            {exportError && <span role="status">{exportError}</span>}
             <ExportFormatToggle value={exportFormat} onChange={setExportFormat} />
             {selected.length === 1 && (
               <button

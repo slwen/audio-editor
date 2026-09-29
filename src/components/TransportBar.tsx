@@ -28,8 +28,10 @@ export function TransportBar({ projectReady }: { projectReady: boolean }) {
   const fileMenu = useRef<HTMLDetailsElement>(null)
   const [projectBusy, setProjectBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const exportController = useRef<AbortController | null>(null)
   const [exportFormat, setExportFormat] = useState<AudioExportFormat>('mp3')
   const [projectMessage, setProjectMessage] = useState('')
+  useEffect(() => () => exportController.current?.abort(), [])
   const gameSongPlaying = useGameSongStore(s => s.playing)
   const gameSongPlayhead = useGameSongStore(s => s.playhead)
   const gameSongDuration = useGameSongStore(s => s.analysis?.durationSec ?? 0)
@@ -126,14 +128,19 @@ export function TransportBar({ projectReady }: { projectReady: boolean }) {
               closeFileMenu()
               const st = useProjectStore.getState()
               setExporting(true)
+              const controller = new AbortController()
+              exportController.current = controller
               setProjectMessage('Exporting mix…')
-              void exportMixedWav(st.clips, st.masterGain, exportFormat)
+              void exportMixedWav(st.clips, st.masterGain, exportFormat, {
+                signal: controller.signal,
+                onProgress: fraction => setProjectMessage(`Exporting mix… ${Math.round(fraction * 100)}%`),
+              })
                 .then(blob => {
                   downloadBlob(blob, audioExportFilename('mixdown', exportFormat))
                   setProjectMessage('Mix exported')
                 })
                 .catch(err => setProjectMessage(err instanceof Error ? err.message : 'Could not export mix'))
-                .finally(() => setExporting(false))
+                .finally(() => { exportController.current = null; setExporting(false) })
             }}>{exporting ? 'Exporting…' : 'Export mix'}</button>
             <div className="file-menu__format" aria-label="Mix export format">
               <span>Format</span>
@@ -178,7 +185,8 @@ export function TransportBar({ projectReady }: { projectReady: boolean }) {
               if (!gameSong) enterGameSongMode()
             }}>Game song</button>
         </div>
-        <div className="transport__time" aria-live="polite">
+        <span className="sr-only" role="status">{playing ? 'Playing' : 'Paused'}</span>
+        <div className="transport__time" role="timer" aria-live="off">
           {gameSong ? <><span>{fmt(gameSongPlayhead)}</span><span className="transport__muted"> / {fmt(gameSongDuration)}</span></> :
             <><span>{fmt(playhead)}</span><span className="transport__muted"> / {fmt(end)}</span>
               {looping && bpm != null && <span className="transport__muted"> · ~{Math.round(cand?.bpm ?? bpm)} BPM</span>}</>}
@@ -216,6 +224,7 @@ export function TransportBar({ projectReady }: { projectReady: boolean }) {
           </button>
         </>}
         {projectMessage && <span className="transport__project-message" role="status">{projectMessage}</span>}
+        {exporting && <button type="button" className="btn btn--small" onClick={() => exportController.current?.abort()}>Cancel export</button>}
       </div>
     </header>
   )

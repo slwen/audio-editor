@@ -1,0 +1,1056 @@
+{
+  "date": "2026-09-30",
+  "timezone": "Australia/Sydney",
+  "baseline": "2fed702 plus existing songMap/decodeAudio edits",
+  "evidenceDirectory": "/Users/samenoka/.codex/visualizations/2026/09/29/01a0ef28-f4db-75d0-8a09-11a612b80fc8/audio-perf-audit/evidence",
+  "metricSummary": {
+    "desktopCold": {
+      "lcpMs": 79,
+      "fcpMs": 80,
+      "cls": 0,
+      "postFcpBlockingMs": 0
+    },
+    "mobileCold": {
+      "lcpMs": 2149,
+      "fcpMs": 2132,
+      "cls": 0,
+      "postFcpBlockingMs": 0,
+      "cpuSlowdown": 4,
+      "network": "Slow 4G"
+    },
+    "stress": {
+      "inpMs": 843,
+      "inputDelayMs": 3,
+      "processingMs": 282,
+      "presentationMs": 558,
+      "clips": 16,
+      "pxPerSecond": 500,
+      "cpuSlowdown": 4
+    },
+    "productionExportLongTaskMs": 7225.42,
+    "encoderStandalone": {
+      "minifiedBytes": 163311,
+      "gzipBytes": 56284
+    }
+  },
+  "limitations": [
+    "Local lab samples, not field percentiles",
+    "No Lighthouse performance score, formal TBT, or Speed Index",
+    "Server-backed workflows tested in development because static preview lacks endpoints",
+    "Frame instrumentation disabled for reported stress runs; timer/observer probes retained",
+    "Audio correctness and screen reader announcements not evaluated"
+  ],
+  "measurements": {
+    "audio-prod-desktop-cold.insights": "The raw trace data was saved to /Users/samenoka/projects/audio-editor/node_modules/.cache/perf-audit/prod-desktop-cold.trace.json.gz.\nThe performance trace has been stopped.\nEmulating viewport: {\"deviceScaleFactor\":1,\"isMobile\":false,\"hasTouch\":false,\"isLandscape\":false,\"width\":1440,\"height\":900}\n## Summary of Performance trace findings:\nURL: http://127.0.0.1:5274/\nTrace bounds: {min: 1665672349550\u00b5s, max: 1665673522548\u00b5s}\nCPU throttling: 1x\nNetwork throttling: none\n\n# Available insight sets\n\nThe following is a list of insight sets. An insight set covers a specific part of the trace, split by navigations. The insights within each insight set are specific to that part of the trace. Be sure to consider the insight set id and bounds when calling functions. If no specific insight set or navigation is mentioned, assume the user is referring to the first one.\n\n## insight set id: NAVIGATION_0\n\nURL: http://127.0.0.1:5274/\nBounds: {min: 1665672351806\u00b5s, max: 1665673522548\u00b5s}\nMetrics (lab / observed):\n  - LCP: 79 ms, event: (eventKey: r-3103, ts: 1665672430523), nodeId: 296\n  - LCP breakdown:\n    - TTFB: 3\u00a0ms, bounds: {min: 1665672351806\u00b5s, max: 1665672354469\u00b5s}\n    - Render delay: 76\u00a0ms, bounds: {min: 1665672354469\u00b5s, max: 1665672430523\u00b5s}\n  - CLS: 0.00\nMetrics (field / real users): n/a \u2013 no data for this page in CrUX\nAvailable insights:\n  - insight name: LCPBreakdown\n    description: Each [subpart has specific improvement strategies](https://developer.chrome.com/docs/performance/insights/lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.\n    relevant trace bounds: {min: 1665672351806\u00b5s, max: 1665672430523\u00b5s}\n    example question: Help me optimize my LCP score\n    example question: Which LCP subpart was most problematic?\n    example question: What can I do to reduce the LCP time for this page load?\n  - insight name: RenderBlocking\n    description: Requests are blocking the page\u2019s initial render, which may delay LCP. [Deferring or inlining](https://developer.chrome.com/docs/performance/insights/render-blocking) can move these network requests out of the critical path.\n    relevant trace bounds: {min: 1665672374932\u00b5s, max: 1665672381359\u00b5s}\n    estimated metric savings: FCP 0 ms, LCP 0 ms\n    example question: Show me the most impactful render-blocking requests that I should focus on\n    example question: How can I reduce the number of render-blocking requests?\n  - insight name: NetworkDependencyTree\n    description: [Avoid chaining critical requests](https://developer.chrome.com/docs/performance/insights/network-dependency-tree) by reducing the length of chains, reducing the download size of resources, or deferring the download of unnecessary resources to improve page load\n    relevant trace bounds: {min: 1665672352788\u00b5s, max: 1665672393575\u00b5s}\n    example question: How do I optimize my network dependency tree?\n\n",
+    "audio-prod-mobile.insights": "The raw trace data was saved to /Users/samenoka/projects/audio-editor/node_modules/.cache/perf-audit/prod-mobile-cold.trace.json.gz.\nThe performance trace has been stopped.\nEmulating network conditions: Slow 4G\nDefault navigation timeout set to 100000 ms\nEmulating viewport: {\"deviceScaleFactor\":1,\"isMobile\":true,\"hasTouch\":true,\"isLandscape\":false,\"width\":390,\"height\":844}\nEmulating CPU throttling: 4x slowdown\n## Summary of Performance trace findings:\nURL: http://127.0.0.1:5274/\nTrace bounds: {min: 1665589067170\u00b5s, max: 1665593433258\u00b5s}\nCPU throttling: 4x\nNetwork throttling: Slow 4G\n\n# Available insight sets\n\nThe following is a list of insight sets. An insight set covers a specific part of the trace, split by navigations. The insights within each insight set are specific to that part of the trace. Be sure to consider the insight set id and bounds when calling functions. If no specific insight set or navigation is mentioned, assume the user is referring to the first one.\n\n## insight set id: NAVIGATION_0\n\nURL: http://127.0.0.1:5274/\nBounds: {min: 1665589071192\u00b5s, max: 1665593433258\u00b5s}\nMetrics (lab / observed):\n  - LCP: 2149 ms, event: (eventKey: r-8511, ts: 1665591220574), nodeId: 154\n  - LCP breakdown:\n    - TTFB: 2\u00a0ms, bounds: {min: 1665589071192\u00b5s, max: 1665589072961\u00b5s}\n    - Render delay: 2,148\u00a0ms, bounds: {min: 1665589072961\u00b5s, max: 1665591220574\u00b5s}\n  - CLS: 0.00\nMetrics (field / real users): n/a \u2013 no data for this page in CrUX\nAvailable insights:\n  - insight name: RenderBlocking\n    description: Requests are blocking the page\u2019s initial render, which may delay LCP. [Deferring or inlining](https://developer.chrome.com/docs/performance/insights/render-blocking) can move these network requests out of the critical path.\n    relevant trace bounds: {min: 1665589656387\u00b5s, max: 1665590275496\u00b5s}\n    estimated metric savings: FCP 549 ms, LCP 549 ms\n    example question: Show me the most impactful render-blocking requests that I should focus on\n    example question: How can I reduce the number of render-blocking requests?\n  - insight name: LCPBreakdown\n    description: Each [subpart has specific improvement strategies](https://developer.chrome.com/docs/performance/insights/lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.\n    relevant trace bounds: {min: 1665589071192\u00b5s, max: 1665591220574\u00b5s}\n    example question: Help me optimize my LCP score\n    example question: Which LCP subpart was most problematic?\n    example question: What can I do to reduce the LCP time for this page load?\n  - insight name: NetworkDependencyTree\n    description: [Avoid chaining critical requests](https://developer.chrome.com/docs/performance/insights/network-dependency-tree) by reducing the length of chains, reducing the download size of resources, or deferring the download of unnecessary resources to improve page load\n    relevant trace bounds: {min: 1665589071800\u00b5s, max: 1665591137548\u00b5s}\n    example question: How do I optimize my network dependency tree?\n\n",
+    "audio-native.insights": "The raw trace data was saved to /Users/samenoka/projects/audio-editor/node_modules/.cache/perf-audit/prod-native-interaction.trace.json.gz.\nThe performance trace has been stopped.\nEmulating viewport: {\"deviceScaleFactor\":1,\"isMobile\":false,\"hasTouch\":false,\"isLandscape\":false,\"width\":1440,\"height\":900}\nEmulating CPU throttling: 4x slowdown\n## Summary of Performance trace findings:\nURL: http://127.0.0.1:5274/\nTrace bounds: {min: 1666099166373\u00b5s, max: 1666168086960\u00b5s}\nCPU throttling: 4x\nNetwork throttling: none\n\n# Available insight sets\n\nThe following is a list of insight sets. An insight set covers a specific part of the trace, split by navigations. The insights within each insight set are specific to that part of the trace. Be sure to consider the insight set id and bounds when calling functions. If no specific insight set or navigation is mentioned, assume the user is referring to the first one.\n\n## insight set id: NO_NAVIGATION\n\nURL: http://127.0.0.1:5274/\nBounds: {min: 1666099166373\u00b5s, max: 1666168086960\u00b5s}\nMetrics (lab / observed):\n  - INP: 843 ms, event: (eventKey: s-113993, ts: 1666162592283)\n  - CLS: 0.00\nMetrics (field / real users): n/a \u2013 no data for this page in CrUX\nAvailable insights:\n  - insight name: INPBreakdown\n    description: Start investigating [how to improve INP](https://developer.chrome.com/docs/performance/insights/inp-breakdown) by looking at the longest subpart\n    relevant trace bounds: {min: 1666162592283\u00b5s, max: 1666163435218\u00b5s}\n    example question: Suggest fixes for my longest interaction\n    example question: Why is a large INP score problematic?\n    example question: What's the biggest contributor to my longest interaction?\n  - insight name: ThirdParties\n    description: 3rd party code can significantly impact load performance. [Reduce and defer loading of 3rd party code](https://developer.chrome.com/docs/performance/insights/third-parties) to prioritize your page\u2019s content.\n    relevant trace bounds: {min: 1666167512026\u00b5s, max: 1666167518864\u00b5s}\n    example question: Which third parties are having the largest impact on my page performance?\n\n",
+    "audio-native.breakdown": "Emulating viewport: {\"deviceScaleFactor\":1,\"isMobile\":false,\"hasTouch\":false,\"isLandscape\":false,\"width\":1440,\"height\":900}\n## Insight Title: INP breakdown\n\n## Insight Summary:\nInteraction to Next Paint (INP) is a metric that tracks the responsiveness of the page when the user interacts with it. INP is a Core Web Vital and the thresholds for how we categorize a score are:\n- Good: 200 milliseconds or less.\n- Needs improvement: more than 200 milliseconds and 500 milliseconds or less.\n- Bad: over 500 milliseconds.\n\nFor a given slow interaction, we can break it down into 3 subparts:\n1. Input delay: starts when the user initiates an interaction with the page, and ends when the event callbacks for the interaction begin to run.\n2. Processing duration: the time it takes for the event callbacks to run to completion.\n3. Presentation delay: the time it takes for the browser to present the next frame which contains the visual result of the interaction.\n\nThe sum of these three subparts is the total latency. It is important to optimize each of these subparts to ensure interactions take as little time as possible. Focusing on the subpart that has the largest score is a good way to start optimizing.\n\n## Detailed analysis:\nThe longest interaction on the page was a `pointerdown` which had a total duration of `843\u00a0ms`. The timings of each of the three subparts were:\n\n1. Input delay: 3\u00a0ms\n2. Processing duration: 282\u00a0ms\n3. Presentation delay: 558\u00a0ms.\n\n## Estimated savings: none\n\n## External resources:\n- https://developer.chrome.com/docs/performance/insights/inp-breakdown\n- https://web.dev/articles/inp\n- https://web.dev/explore/how-to-optimize-inp\n- https://web.dev/articles/optimize-long-tasks\n- https://web.dev/articles/avoid-large-complex-layouts-and-layout-thrashing",
+    "audio-ui-export-prod": {
+      "elapsed": 10012.899999856949,
+      "counts": {
+        "clear": 0,
+        "scheduledSave": 0,
+        "idb": 0
+      },
+      "frameCount": 171,
+      "frameP50": 16.699999999982538,
+      "frameP95": 16.79999999998836,
+      "frameMax": 7199.700000000012,
+      "waveformPaths": 0,
+      "waveformSegments": 0,
+      "waveformMs": 0,
+      "pathP50": 0,
+      "pathP95": 0,
+      "pathMax": 0,
+      "samplePaths": [],
+      "longtasks": [
+        {
+          "start": 206740.79999995232,
+          "ms": 7225
+        }
+      ],
+      "events": [],
+      "idb": []
+    },
+    "audio-play-1-prod": {
+      "counts": {
+        "clear": 363,
+        "scheduledSave": 363,
+        "idb": 0
+      },
+      "frameCount": 182,
+      "frameP50": 16.699999999982538,
+      "frameP95": 16.70000000001164,
+      "frameMax": 16.800000000017462,
+      "waveformPaths": 178,
+      "waveformSegments": 3441630,
+      "waveformMs": 143.40000128746033,
+      "pathP50": 0.7999999523162842,
+      "pathP95": 1,
+      "pathMax": 2.299999952316284,
+      "samplePaths": [
+        {
+          "ms": 2.299999952316284,
+          "segments": 19335,
+          "width": 1139,
+          "height": 811
+        },
+        {
+          "ms": 1.0999999046325684,
+          "segments": 19335,
+          "width": 1139,
+          "height": 811
+        },
+        {
+          "ms": 0.7000000476837158,
+          "segments": 19335,
+          "width": 1139,
+          "height": 811
+        },
+        {
+          "ms": 0.7000000476837158,
+          "segments": 19335,
+          "width": 1139,
+          "height": 811
+        }
+      ],
+      "longtasks": [],
+      "events": [],
+      "idb": []
+    },
+    "audio-play-16-uninstrumented4x": {
+      "counts": {
+        "clear": 90,
+        "scheduledSave": 90,
+        "idb": 0
+      },
+      "frameCount": 44,
+      "frameP50": 66.69999999999982,
+      "frameP95": 83.30000000000018,
+      "frameMax": 99.87400000000025,
+      "waveformPaths": 0,
+      "waveformSegments": 0,
+      "waveformMs": 0,
+      "pathP50": 0,
+      "pathP95": 0,
+      "pathMax": 0,
+      "samplePaths": [],
+      "longtasks": [
+        {
+          "start": 2542.4000000953674,
+          "ms": 74
+        },
+        {
+          "start": 2617.2999999523163,
+          "ms": 73
+        },
+        {
+          "start": 2691.7999999523163,
+          "ms": 74
+        },
+        {
+          "start": 2769.9000000953674,
+          "ms": 73
+        },
+        {
+          "start": 2843.600000143051,
+          "ms": 73
+        },
+        {
+          "start": 2917.7999999523163,
+          "ms": 73
+        },
+        {
+          "start": 2991.5,
+          "ms": 72
+        },
+        {
+          "start": 3063.7000000476837,
+          "ms": 69
+        },
+        {
+          "start": 3133.5,
+          "ms": 69
+        },
+        {
+          "start": 3202.5,
+          "ms": 69
+        },
+        {
+          "start": 3271.7999999523163,
+          "ms": 69
+        },
+        {
+          "start": 3341.2999999523163,
+          "ms": 69
+        },
+        {
+          "start": 3411.100000143051,
+          "ms": 68
+        },
+        {
+          "start": 3480.2999999523163,
+          "ms": 69
+        },
+        {
+          "start": 3550,
+          "ms": 69
+        },
+        {
+          "start": 3619.5,
+          "ms": 69
+        },
+        {
+          "start": 3688.5,
+          "ms": 68
+        },
+        {
+          "start": 3757.2000000476837,
+          "ms": 68
+        },
+        {
+          "start": 3825.7999999523163,
+          "ms": 69
+        },
+        {
+          "start": 3895,
+          "ms": 68
+        },
+        {
+          "start": 3963.7000000476837,
+          "ms": 69
+        },
+        {
+          "start": 4033.9000000953674,
+          "ms": 69
+        },
+        {
+          "start": 4103.700000047684,
+          "ms": 67
+        },
+        {
+          "start": 4171.200000047684,
+          "ms": 68
+        },
+        {
+          "start": 4239.5,
+          "ms": 68
+        },
+        {
+          "start": 4307.700000047684,
+          "ms": 68
+        },
+        {
+          "start": 4376.299999952316,
+          "ms": 69
+        },
+        {
+          "start": 4445.299999952316,
+          "ms": 68
+        },
+        {
+          "start": 4513.900000095367,
+          "ms": 68
+        },
+        {
+          "start": 4582.799999952316,
+          "ms": 68
+        },
+        {
+          "start": 4651.900000095367,
+          "ms": 68
+        },
+        {
+          "start": 4720.200000047684,
+          "ms": 68
+        },
+        {
+          "start": 4788.299999952316,
+          "ms": 68
+        },
+        {
+          "start": 4857.200000047684,
+          "ms": 68
+        },
+        {
+          "start": 4926.200000047684,
+          "ms": 68
+        },
+        {
+          "start": 4994.700000047684,
+          "ms": 69
+        },
+        {
+          "start": 5063.799999952316,
+          "ms": 68
+        },
+        {
+          "start": 5132,
+          "ms": 68
+        },
+        {
+          "start": 5200.299999952316,
+          "ms": 68
+        },
+        {
+          "start": 5268.900000095367,
+          "ms": 68
+        },
+        {
+          "start": 5337.900000095367,
+          "ms": 67
+        },
+        {
+          "start": 5406.5,
+          "ms": 68
+        }
+      ],
+      "events": [],
+      "idb": []
+    },
+    "audio-play-16-zoom-uninstrumented4x": {
+      "counts": {
+        "clear": 18,
+        "scheduledSave": 18,
+        "idb": 0
+      },
+      "frameCount": 8,
+      "frameP50": 433.2999999999993,
+      "frameP95": 433.39999999999964,
+      "frameMax": 433.40000000000055,
+      "waveformPaths": 0,
+      "waveformSegments": 0,
+      "waveformMs": 0,
+      "pathP50": 0,
+      "pathP95": 0,
+      "pathMax": 0,
+      "samplePaths": [],
+      "longtasks": [
+        {
+          "start": 7037.900000095367,
+          "ms": 220
+        },
+        {
+          "start": 7258.100000143051,
+          "ms": 432
+        },
+        {
+          "start": 7690.900000095367,
+          "ms": 427
+        },
+        {
+          "start": 8118.100000143051,
+          "ms": 428
+        },
+        {
+          "start": 8546.5,
+          "ms": 431
+        },
+        {
+          "start": 8978.400000095367,
+          "ms": 429
+        },
+        {
+          "start": 9408.200000047684,
+          "ms": 429
+        },
+        {
+          "start": 9838.700000047684,
+          "ms": 435
+        }
+      ],
+      "events": [],
+      "idb": []
+    },
+    "audio-play-16-zoom-uninstrumented1x": {
+      "counts": {
+        "clear": 62,
+        "scheduledSave": 62,
+        "idb": 0
+      },
+      "frameCount": 30,
+      "frameP50": 100,
+      "frameP95": 116.69999999998254,
+      "frameMax": 116.70000000001164,
+      "waveformPaths": 0,
+      "waveformSegments": 0,
+      "waveformMs": 0,
+      "pathP50": 0,
+      "pathP95": 0,
+      "pathMax": 0,
+      "samplePaths": [],
+      "longtasks": [
+        {
+          "start": 146613.70000004768,
+          "ms": 52
+        },
+        {
+          "start": 146666.60000014305,
+          "ms": 102
+        },
+        {
+          "start": 146769,
+          "ms": 103
+        },
+        {
+          "start": 146872.29999995232,
+          "ms": 101
+        },
+        {
+          "start": 146973.70000004768,
+          "ms": 101
+        },
+        {
+          "start": 147075,
+          "ms": 100
+        },
+        {
+          "start": 147175.10000014305,
+          "ms": 101
+        },
+        {
+          "start": 147276.29999995232,
+          "ms": 100
+        },
+        {
+          "start": 147376.79999995232,
+          "ms": 101
+        },
+        {
+          "start": 147478.20000004768,
+          "ms": 102
+        },
+        {
+          "start": 147580.70000004768,
+          "ms": 102
+        },
+        {
+          "start": 147683.5,
+          "ms": 102
+        },
+        {
+          "start": 147785.60000014305,
+          "ms": 101
+        },
+        {
+          "start": 147887.20000004768,
+          "ms": 102
+        },
+        {
+          "start": 147989.60000014305,
+          "ms": 102
+        },
+        {
+          "start": 148091.79999995232,
+          "ms": 100
+        },
+        {
+          "start": 148192.20000004768,
+          "ms": 100
+        },
+        {
+          "start": 148293.20000004768,
+          "ms": 102
+        },
+        {
+          "start": 148395.70000004768,
+          "ms": 103
+        },
+        {
+          "start": 148498.90000009537,
+          "ms": 102
+        },
+        {
+          "start": 148601,
+          "ms": 101
+        },
+        {
+          "start": 148702.79999995232,
+          "ms": 101
+        },
+        {
+          "start": 148804,
+          "ms": 102
+        },
+        {
+          "start": 148906.10000014305,
+          "ms": 101
+        },
+        {
+          "start": 149008,
+          "ms": 101
+        },
+        {
+          "start": 149109.40000009537,
+          "ms": 103
+        },
+        {
+          "start": 149213,
+          "ms": 104
+        },
+        {
+          "start": 149317.20000004768,
+          "ms": 104
+        },
+        {
+          "start": 149421.60000014305,
+          "ms": 103
+        },
+        {
+          "start": 149525,
+          "ms": 103
+        }
+      ],
+      "events": [],
+      "idb": []
+    },
+    "audio-game-load": {
+      "loadMs": 1543.2000000476837,
+      "state": "ready",
+      "duration": 241.68,
+      "suggestions": 8
+    },
+    "audio-game-reload": {
+      "loadMs": 1476.0999999046326,
+      "counts": {
+        "clear": 0,
+        "scheduledSave": 0,
+        "idb": 0
+      },
+      "frameCount": 0,
+      "frameP50": 0,
+      "frameP95": 0,
+      "frameMax": 0,
+      "waveformPaths": 0,
+      "waveformSegments": 0,
+      "waveformMs": 0,
+      "pathP50": 0,
+      "pathP95": 0,
+      "pathMax": 0,
+      "samplePaths": [],
+      "longtasks": [
+        {
+          "start": 499499.40000009537,
+          "ms": 133
+        }
+      ],
+      "events": [],
+      "idb": [],
+      "resources": [
+        {
+          "name": "http://localhost:5174/__game-song/stem?source=cathedral-of-iron.mp3&stem=top",
+          "transfer": 92805512,
+          "encoded": 92805212,
+          "duration": 143.59999990463257
+        },
+        {
+          "name": "http://localhost:5174/__game-song/stem?source=cathedral-of-iron.mp3&stem=base",
+          "transfer": 92805512,
+          "encoded": 92805212,
+          "duration": 143.79999995231628
+        },
+        {
+          "name": "http://localhost:5174/__game-song/stem?source=cathedral-of-iron.mp3&stem=base",
+          "transfer": 92805512,
+          "encoded": 92805212,
+          "duration": 153.70000004768372
+        },
+        {
+          "name": "http://localhost:5174/__game-song/stem?source=cathedral-of-iron.mp3&stem=top",
+          "transfer": 92805512,
+          "encoded": 92805212,
+          "duration": 154
+        }
+      ]
+    },
+    "audio-peaks": {
+      "peaksMs": [
+        28.40000009536743,
+        22.899999856948853,
+        21.399999856948853
+      ],
+      "temporaryBytes": 46402560
+    },
+    "audio-analysis-prep": {
+      "prepMs": 54.799999952316284,
+      "inputBytes": 92805120,
+      "outputBytes": 23201280
+    },
+    "audio-original-retention": {
+      "liveClips": 0,
+      "liveBuffers": 0,
+      "originalKeys": 1,
+      "originalBytes": 5821836
+    },
+    "audio-a11y-manual": {
+      "sliders": [
+        {
+          "name": "Loop back to",
+          "tabIndex": -1
+        },
+        {
+          "name": "Wrap at",
+          "tabIndex": -1
+        }
+      ],
+      "duplicateIds": [],
+      "badAria": []
+    },
+    "audio-find-loops": {
+      "analyzeMs": 1303.4000000953674,
+      "status": "ready",
+      "candidates": 156,
+      "counts": {
+        "clear": 5,
+        "scheduledSave": 5,
+        "idb": 2
+      },
+      "frameCount": 182,
+      "frameP50": 16.699999999953434,
+      "frameP95": 16.70000000006985,
+      "frameMax": 16.800000000046566,
+      "waveformPaths": 6,
+      "waveformSegments": 116004,
+      "waveformMs": 4.799999952316284,
+      "pathP50": 0.5999999046325684,
+      "pathP95": 0.6000001430511475,
+      "pathMax": 1.9000000953674316,
+      "samplePaths": [
+        {
+          "ms": 1.9000000953674316,
+          "segments": 19334,
+          "width": 839,
+          "height": 1940
+        },
+        {
+          "ms": 0.5999999046325684,
+          "segments": 19334,
+          "width": 839,
+          "height": 1940
+        },
+        {
+          "ms": 0.5999999046325684,
+          "segments": 19334,
+          "width": 839,
+          "height": 1940
+        },
+        {
+          "ms": 0.6000001430511475,
+          "segments": 19334,
+          "width": 839,
+          "height": 1940
+        }
+      ],
+      "longtasks": [
+        {
+          "start": 580785.2999999523,
+          "ms": 99
+        }
+      ],
+      "events": [],
+      "idb": [
+        {
+          "kind": "idb-serialize",
+          "ms": 1.7000000476837158,
+          "bytes": 5821836
+        },
+        {
+          "kind": "idb-serialize",
+          "ms": 4.900000095367432,
+          "bytes": 5821836
+        }
+      ]
+    },
+    "audio-autosave-verified": {
+      "during": {
+        "counts": {
+          "clear": 194,
+          "scheduledSave": 194,
+          "idb": 0
+        },
+        "frameCount": 0,
+        "frameP50": 0,
+        "frameP95": 0,
+        "frameMax": 0,
+        "waveformPaths": 187,
+        "waveformSegments": 3615645,
+        "waveformMs": 132.89999914169312,
+        "pathP50": 0.7000000476837158,
+        "pathP95": 1,
+        "pathMax": 2.3000001907348633,
+        "samplePaths": [
+          {
+            "ms": 2.3000001907348633,
+            "segments": 19335,
+            "width": 899,
+            "height": 1940
+          },
+          {
+            "ms": 0.7000000476837158,
+            "segments": 19335,
+            "width": 899,
+            "height": 1940
+          },
+          {
+            "ms": 0.7000000476837158,
+            "segments": 19335,
+            "width": 899,
+            "height": 1940
+          },
+          {
+            "ms": 0.7000000476837158,
+            "segments": 19335,
+            "width": 899,
+            "height": 1940
+          }
+        ],
+        "longtasks": [],
+        "events": [],
+        "idb": []
+      },
+      "after": {
+        "counts": {
+          "clear": 196,
+          "scheduledSave": 196,
+          "idb": 1
+        },
+        "frameCount": 0,
+        "frameP50": 0,
+        "frameP95": 0,
+        "frameMax": 0,
+        "waveformPaths": 188,
+        "waveformSegments": 3634980,
+        "waveformMs": 133.49999928474426,
+        "pathP50": 0.7000000476837158,
+        "pathP95": 1,
+        "pathMax": 2.3000001907348633,
+        "samplePaths": [
+          {
+            "ms": 2.3000001907348633,
+            "segments": 19335,
+            "width": 899,
+            "height": 1940
+          },
+          {
+            "ms": 0.7000000476837158,
+            "segments": 19335,
+            "width": 899,
+            "height": 1940
+          },
+          {
+            "ms": 0.7000000476837158,
+            "segments": 19335,
+            "width": 899,
+            "height": 1940
+          },
+          {
+            "ms": 0.7000000476837158,
+            "segments": 19335,
+            "width": 899,
+            "height": 1940
+          }
+        ],
+        "longtasks": [],
+        "events": [],
+        "idb": [
+          {
+            "kind": "idb-serialize",
+            "ms": 3.4000000953674316,
+            "bytes": 5821836
+          }
+        ]
+      }
+    },
+    "audio-cls": "Emulating viewport: {\"deviceScaleFactor\":1,\"isMobile\":false,\"hasTouch\":false,\"isLandscape\":false,\"width\":1440,\"height\":900}\n## Insight Title: Layout shift culprits\n\n## Insight Summary:\nCumulative Layout Shifts (CLS) is a measure of the largest burst of layout shifts for every unexpected layout shift that occurs during the lifecycle of a page. This is a Core Web Vital and the thresholds for categorizing a score are:\n- Good: 0.1 or less\n- Needs improvement: more than 0.1 and less than or equal to 0.25\n- Bad: over 0.25\n\n## Detailed analysis:\nNo layout shifts were found.\n\n## Estimated savings: none\n\n## External resources:\n- https://developer.chrome.com/docs/performance/insights/cls-culprit\n- https://web.dev/articles/cls\n- https://web.dev/articles/optimize-cls"
+  },
+  "implementation": {
+    "status": "implemented and verified locally",
+    "verification": {
+      "testsPassed": 120,
+      "testFiles": 29,
+      "build": "passed",
+      "lint": "passed",
+      "diffCheck": "passed",
+      "accessibilitySnapshotScore": 100
+    },
+    "timeline": {
+      "baselineFrameP95Ms": 433.4,
+      "fixedFrameP95Ms": 16.79999999998836,
+      "clips": 16,
+      "pixelsPerSecond": 500,
+      "cpuSlowdown": 4,
+      "baselineInpMs": 843,
+      "fixedInpMs": 36,
+      "observedLongTasks": []
+    },
+    "export": {
+      "baselineLongestMainThreadTaskMs": 7225.42,
+      "fixedLongestMainThreadTaskMs": 5.646,
+      "untraced": {
+        "counts": {
+          "clear": 0,
+          "scheduledSave": 0,
+          "idb": 0
+        },
+        "frameCount": 0,
+        "frameP50": 0,
+        "frameP95": 16.70000000001164,
+        "frameMax": 16.800000000017462,
+        "waveformPaths": 0,
+        "waveformSegments": 0,
+        "waveformMs": 0,
+        "pathP50": 0,
+        "pathP95": 0,
+        "pathMax": 0,
+        "samplePaths": [],
+        "longtasks": [],
+        "events": [],
+        "idb": [],
+        "elapsedMs": 12547.900000095367,
+        "exported": {
+          "bytes": 3871488,
+          "type": "audio/mpeg"
+        }
+      },
+      "traced": {
+        "counts": {
+          "clear": 0,
+          "scheduledSave": 0,
+          "idb": 0
+        },
+        "frameCount": 0,
+        "frameP50": 0,
+        "frameP95": 16.79999999998836,
+        "frameMax": 66.69999999999709,
+        "waveformPaths": 0,
+        "waveformSegments": 0,
+        "waveformMs": 0,
+        "pathP50": 0,
+        "pathP95": 0,
+        "pathMax": 0,
+        "samplePaths": [],
+        "longtasks": [],
+        "events": [],
+        "idb": [],
+        "elapsedMs": 14867,
+        "exported": {
+          "bytes": 3871488,
+          "type": "audio/mpeg"
+        }
+      },
+      "cancellation": {
+        "ms": 102.59999990463257,
+        "buttonDisabled": false,
+        "message": true
+      },
+      "note": "Responsiveness improved; full wall-clock export time has no recorded baseline comparator."
+    },
+    "autosave": {
+      "during": {
+        "counts": {
+          "clear": 3,
+          "scheduledSave": 1,
+          "idb": 1
+        },
+        "frameCount": 0,
+        "frameP50": 0,
+        "frameP95": 0,
+        "frameMax": 0,
+        "waveformPaths": 0,
+        "waveformSegments": 0,
+        "waveformMs": 0,
+        "pathP50": 0,
+        "pathP95": 0,
+        "pathMax": 0,
+        "samplePaths": [],
+        "longtasks": [],
+        "events": [],
+        "idb": [
+          {
+            "kind": "idb-serialize",
+            "ms": 0.09999990463256836,
+            "bytes": 0
+          }
+        ]
+      },
+      "after": {
+        "counts": {
+          "clear": 6,
+          "scheduledSave": 2,
+          "idb": 2
+        },
+        "frameCount": 0,
+        "frameP50": 0,
+        "frameP95": 0,
+        "frameMax": 0,
+        "waveformPaths": 0,
+        "waveformSegments": 0,
+        "waveformMs": 0,
+        "pathP50": 0,
+        "pathP95": 0,
+        "pathMax": 0,
+        "samplePaths": [],
+        "longtasks": [],
+        "events": [],
+        "idb": [
+          {
+            "kind": "idb-serialize",
+            "ms": 0.09999990463256836,
+            "bytes": 0
+          },
+          {
+            "kind": "idb-serialize",
+            "ms": 0.09999990463256836,
+            "bytes": 0
+          }
+        ]
+      },
+      "records": [
+        {
+          "store": "kv",
+          "bytes": 0,
+          "ms": 0.19999980926513672
+        },
+        {
+          "store": "kv",
+          "bytes": 0,
+          "ms": 0.09999990463256836
+        }
+      ]
+    },
+    "stems": {
+      "first": {
+        "elapsedMs": 2092.5999999046326,
+        "summary": {
+          "counts": {
+            "clear": 0,
+            "scheduledSave": 0,
+            "idb": 0
+          },
+          "frameCount": 0,
+          "frameP50": 0,
+          "frameP95": 0,
+          "frameMax": 0,
+          "waveformPaths": 0,
+          "waveformSegments": 0,
+          "waveformMs": 0,
+          "pathP50": 0,
+          "pathP95": 0,
+          "pathMax": 0,
+          "samplePaths": [],
+          "longtasks": [],
+          "events": [],
+          "idb": []
+        },
+        "status": "ready"
+      },
+      "second": {
+        "elapsedMs": 148.39999985694885,
+        "summary": {
+          "counts": {
+            "clear": 0,
+            "scheduledSave": 0,
+            "idb": 0
+          },
+          "frameCount": 0,
+          "frameP50": 0,
+          "frameP95": 0,
+          "frameMax": 0,
+          "waveformPaths": 0,
+          "waveformSegments": 0,
+          "waveformMs": 0,
+          "pathP50": 0,
+          "pathP95": 0,
+          "pathMax": 0,
+          "samplePaths": [],
+          "longtasks": [],
+          "events": [],
+          "idb": []
+        },
+        "status": "ready"
+      },
+      "secondStemRequests": 0,
+      "stems": [
+        {
+          "name": "http://localhost:5174/__game-song/stem?source=cathedral-of-iron.mp3&stem=base",
+          "bytes": 92805512,
+          "decoded": 92805212
+        },
+        {
+          "name": "http://localhost:5174/__game-song/stem?source=cathedral-of-iron.mp3&stem=top",
+          "bytes": 92805512,
+          "decoded": 92805212
+        }
+      ],
+      "loop": {
+        "startSec": 63.69031293177723,
+        "endSec": 183.09288787764405
+      }
+    },
+    "httpValidators": {
+      "firstStatus": 200,
+      "cacheControl": "private, no-cache",
+      "etag": "mtime and size",
+      "conditionalStatus": 304,
+      "conditionalBodyBytes": 0
+    },
+    "migration": {
+      "before": {
+        "version": 2,
+        "metadataBytes": 96044,
+        "sourceCount": 0,
+        "sourceBytes": 0,
+        "masterGain": 0.8,
+        "playhead": 0.2,
+        "clipCount": 1
+      },
+      "after": {
+        "version": 2,
+        "metadataBytes": 0,
+        "sourceCount": 1,
+        "sourceBytes": 96044,
+        "masterGain": 0.6,
+        "playhead": 0.2,
+        "clipCount": 1
+      },
+      "ui": "0:00.20 / 0:08.00"
+    },
+    "restoredPlayback": {
+      "sources": [
+        {
+          "length": 48000,
+          "channels": 1,
+          "sampleRate": 48000,
+          "sample": -0.18310546875
+        }
+      ],
+      "clock": "0:00.32 / 0:08.00",
+      "gain": "0.6"
+    },
+    "keyboard": {
+      "before": 63.69031293177723,
+      "after": 66.12829919444995,
+      "focused": true,
+      "outline": "rgb(94, 253, 247) solid 2px"
+    },
+    "load": {
+      "baselineLcpMs": 2149,
+      "fixedLcpMs": 1939,
+      "fixedFcpMs": 1908,
+      "cls": 0,
+      "cpuSlowdown": 4,
+      "network": "Slow 4G",
+      "baselineEntryGzipBuildBytes": 159360,
+      "fixedEntryGzipBuildBytesApprox": 103600
+    },
+    "cssExperiment": {
+      "externalStylesheetLcpMs": 1939,
+      "inlineStylesheetLcpMs": 1852,
+      "externalStylesheetCls": 0,
+      "inlineStylesheetCls": 0,
+      "toolEstimatedSavingsMs": 580,
+      "decision": "Keep the existing cacheable stylesheet; one inline experiment saved only 87 ms and JS remains the critical path."
+    },
+    "evidenceDirectory": "/Users/samenoka/.codex/visualizations/2026/09/29/01a0ef28-f4db-75d0-8a09-11a612b80fc8/audio-perf-audit/evidence/fixes"
+  }
+}

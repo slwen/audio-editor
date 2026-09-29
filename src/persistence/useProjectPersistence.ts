@@ -4,6 +4,7 @@ import { cacheBuffer } from '@/audio/bufferCache'
 import { setPeaksForBuffer } from '@/lib/peaksCache'
 import { loadOriginalBytesMap, takeOriginalBytesMap } from '@/persistence/fileBytes'
 import { loadProject, saveProject } from '@/persistence/projectDb'
+import { subscribeAutosave } from '@/persistence/autosave'
 import type { PersistedProject } from '@/persistence/projectDb'
 import { useProjectStore } from '@/store/useProjectStore'
 
@@ -13,7 +14,6 @@ export function useProjectPersistence(): boolean {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    let saveTimer: number
     let unsub: (() => void) | undefined
     let cancelled = false
 
@@ -54,25 +54,21 @@ export function useProjectPersistence(): boolean {
       }
       if (cancelled) return
       setReady(true)
-      unsub = useProjectStore.subscribe((s) => {
-        window.clearTimeout(saveTimer)
-        saveTimer = window.setTimeout(() => {
-          const data: PersistedProject = {
-            version: 1,
-            clips: s.clips,
-            bufferMeta: s.bufferMeta,
-            playhead: s.playhead,
-            masterGain: s.masterGain,
-            fileBytes: takeOriginalBytesMap(),
-          }
-          void saveProject(data)
-        }, 500)
+      unsub = subscribeAutosave(useProjectStore, (s) => {
+        const data: PersistedProject = {
+          version: 1,
+          clips: s.clips,
+          bufferMeta: s.bufferMeta,
+          playhead: s.playhead,
+          masterGain: s.masterGain,
+          fileBytes: takeOriginalBytesMap(new Set(s.bufferMeta.map(meta => meta.id))),
+        }
+        void saveProject(data).catch(error => console.error('Could not autosave project', error))
       })
     })()
 
     return () => {
       cancelled = true
-      window.clearTimeout(saveTimer)
       unsub?.()
     }
   }, [loadSnapshot])

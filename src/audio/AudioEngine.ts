@@ -29,6 +29,7 @@ class AudioEngine {
   }
 
   private ctx: AudioContext | null = null
+  private initializing: Promise<AudioContext> | null = null
   private master: GainNode | null = null
   private active: ActiveChain[] = []
   private playheadAtStart = 0
@@ -57,12 +58,23 @@ class AudioEngine {
 
   async init(): Promise<AudioContext> {
     if (this.ctx) return this.ctx
+    if (this.initializing) return this.initializing
     const ctx = new AudioContext()
-    await ensureSoundTouchWorklet(ctx)
-    this.master = ctx.createGain()
-    this.master.connect(ctx.destination)
-    this.ctx = ctx
-    return ctx
+    this.initializing = (async () => {
+      try {
+        await ensureSoundTouchWorklet(ctx)
+        this.master = ctx.createGain()
+        this.master.connect(ctx.destination)
+        this.ctx = ctx
+        return ctx
+      } catch (error) {
+        await ctx.close()
+        throw error
+      } finally {
+        this.initializing = null
+      }
+    })()
+    return this.initializing
   }
 
   setMasterGain(linear: number): void {

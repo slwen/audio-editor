@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { seekGameSong, setMarker } from '@/gameSong/actions'
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { moveMarkerToBoundary, nudgeMarker, seekGameSong, setMarker } from '@/gameSong/actions'
 import { useGameSongStore } from '@/gameSong/store'
 import { formatTime } from '@/lib/formatTime'
 import { readCssColor } from '@/lib/themeCanvas'
@@ -84,6 +84,13 @@ export function GameSongWaveform() {
   }
 
   const pct = (sec: number) => `${(sec / duration) * 100}%`
+  const onMarkerKey = (event: ReactKeyboardEvent, which: 'start' | 'end') => {
+    if (!['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.key === 'Home' || event.key === 'End') moveMarkerToBoundary(which, event.key === 'End')
+    else nudgeMarker(which, (event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1 : 1) * (event.shiftKey ? 10 : 1))
+  }
 
   return (
     <div className="gs-wave" ref={wrap} style={{ height: HEIGHT }}
@@ -97,12 +104,14 @@ export function GameSongWaveform() {
       <div className="gs-wave__loop" style={{ left: pct(loop.startSec), width: pct(loop.endSec - loop.startSec) }} />
       <div className="gs-wave__marker gs-wave__marker--start" style={{ left: pct(loop.startSec) }}
         onPointerDown={e => onMarkerDown(e, 'start')} onPointerMove={e => { if (dragging === 'start') setMarker('start', secAt(e)) }} onPointerUp={() => setDragging(null)}
-        role="slider" aria-label="Loop back to" aria-valuemin={0} aria-valuemax={duration} aria-valuenow={loop.startSec}>
+        tabIndex={0} onKeyDown={event => onMarkerKey(event, 'start')}
+        role="slider" aria-label="Loop back to" aria-valuemin={0} aria-valuemax={Math.max(0, loop.endSec - 1)} aria-valuenow={loop.startSec} aria-valuetext={formatTime(loop.startSec)}>
         <span>Loop back to</span>
       </div>
       <div className="gs-wave__marker gs-wave__marker--end" style={{ left: pct(loop.endSec) }}
         onPointerDown={e => onMarkerDown(e, 'end')} onPointerMove={e => { if (dragging === 'end') setMarker('end', secAt(e)) }} onPointerUp={() => setDragging(null)}
-        role="slider" aria-label="Wrap at" aria-valuemin={0} aria-valuemax={duration} aria-valuenow={loop.endSec}>
+        tabIndex={0} onKeyDown={event => onMarkerKey(event, 'end')}
+        role="slider" aria-label="Wrap at" aria-valuemin={Math.min(duration, loop.startSec + 1)} aria-valuemax={duration} aria-valuenow={loop.endSec} aria-valuetext={formatTime(loop.endSec)}>
         <span>Wrap at</span>
       </div>
       <div className="gs-wave__playhead" style={{ left: pct(playhead) }} />

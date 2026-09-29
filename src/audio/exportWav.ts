@@ -8,18 +8,19 @@ import {
   clipTimelineEnd,
   getProjectEndTime,
 } from '@/lib/clipMath'
-import { encodeMp3 } from '@/audio/encodeMp3'
+import { encodeMp3InWorker, type ExportOptions } from '@/audio/encodeMp3InWorker'
 import { writeWavStereo16 } from '@/audio/wavBytes'
 import type { Clip } from '@/types'
 
 export type AudioExportFormat = 'mp3' | 'wav'
 
-function encodeAudioBuffer(rendered: AudioBuffer, format: AudioExportFormat): Blob {
+async function encodeAudioBuffer(rendered: AudioBuffer, format: AudioExportFormat, options: ExportOptions): Promise<Blob> {
+  options.signal?.throwIfAborted()
   switch (format) {
     case 'wav':
       return new Blob([writeWavStereo16(rendered)], { type: 'audio/wav' })
     case 'mp3':
-      return encodeMp3(rendered)
+      return encodeMp3InWorker(rendered, options)
     default: {
       const _exhaustive: never = format
       throw new Error(`Unsupported export format: ${_exhaustive}`)
@@ -43,8 +44,10 @@ export function audioExportFilename(stem: string, format: AudioExportFormat): st
 export async function exportMixedWav(
   clips: Clip[],
   masterLinear: number,
-  format: AudioExportFormat = 'mp3'
+  format: AudioExportFormat = 'mp3',
+  options: ExportOptions = {}
 ): Promise<Blob> {
+  options.signal?.throwIfAborted()
   const duration = getProjectEndTime(clips) + 0.25
   const sampleRate = 48000
   const length = Math.ceil(duration * sampleRate)
@@ -97,7 +100,7 @@ export async function exportMixedWav(
   }
 
   const rendered = await offline.startRendering()
-  return encodeAudioBuffer(rendered, format)
+  return encodeAudioBuffer(rendered, format, options)
 }
 
 /**
@@ -107,8 +110,10 @@ export async function exportMixedWav(
 export async function exportSelectedWav(
   clips: Clip[],
   masterLinear: number,
-  format: AudioExportFormat = 'mp3'
+  format: AudioExportFormat = 'mp3',
+  options: ExportOptions = {}
 ): Promise<Blob> {
+  options.signal?.throwIfAborted()
   if (clips.length === 0) throw new Error('No clips selected')
 
   const sorted = [...clips].sort((a, b) => a.startTime - b.startTime)
@@ -176,5 +181,5 @@ export async function exportSelectedWav(
   }
 
   const rendered = await offline.startRendering()
-  return encodeAudioBuffer(rendered, format)
+  return encodeAudioBuffer(rendered, format, options)
 }

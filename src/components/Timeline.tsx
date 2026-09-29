@@ -216,6 +216,7 @@ export function Timeline() {
       const cw = Math.max(2, dur * pps)
       const y0 = RULER_H + row * ROW_H + 6
       const ch = ROW_H - 12
+      if (x0 + cw < 0 || x0 > w || y0 + ch < 0 || y0 > h) return
       const isSelected = selectionSet.has(c.id)
       const accent = clipAccentHex(cc)
 
@@ -237,7 +238,9 @@ export function Timeline() {
         ctx.beginPath()
         const mid = y0 + ch / 2
         const endT = clipTimelineEnd(cc)
-        for (let ix = 0; ix < cw; ix++) {
+        const firstPixel = Math.max(0, Math.ceil(-x0))
+        const lastPixel = Math.min(Math.ceil(cw), Math.ceil(w - x0))
+        for (let ix = firstPixel; ix < lastPixel; ix++) {
           const frac = cw <= 1 ? 0 : ix / (cw - 1)
           const tLine = Math.min(endT, Math.max(start, start + frac * dur))
           const srcT = sourceTimeAtTimelineTime(cc, tLine)
@@ -260,14 +263,6 @@ export function Timeline() {
 
     for (const c of clipsDrawOrder) drawClip(c)
 
-    const phx = tx(playhead)
-    ctx.strokeStyle = css('--timeline-playhead', '#ff5dcc')
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(phx, 0)
-    ctx.lineTo(phx, h)
-    ctx.stroke()
-
     const mq = marqueeRef.current
     if (mq) {
       const x = Math.min(mq.x0, mq.x1)
@@ -281,7 +276,7 @@ export function Timeline() {
     }
 
     syncHoverDom()
-  }, [bufferMeta, clipsDrawOrder, playhead, pps, selection, syncHoverDom, tx, xt])
+  }, [bufferMeta, clipsDrawOrder, pps, selection, syncHoverDom, tx, xt])
 
   const requestDraw = useCallback(() => {
     if (rafDrawRef.current) return
@@ -315,7 +310,7 @@ export function Timeline() {
     if (w <= 0) return
     const st = useProjectStore.getState()
     const next = scrollForPlayheadCentered(playhead, w, st.clips, st.pixelsPerSecond)
-    st.setScrollX(next)
+    if (next !== st.scrollX) st.setScrollX(next)
   }, [playhead, isPlaying, clips, pps])
 
   useEffect(() => {
@@ -654,6 +649,7 @@ export function Timeline() {
           onPointerCancel={onPointerUp}
           onPointerLeave={onPointerLeave}
         />
+        <div className="timeline-playhead" aria-hidden style={{ transform: `translateX(${tx(playhead)}px)` }} />
         <div className="timeline-hover-layer">
           <div ref={hoverLineRef} className="timeline-hover-line" aria-hidden />
           <div ref={hoverTimeRef} className="timeline-hover-time" aria-hidden />
