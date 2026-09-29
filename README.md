@@ -6,6 +6,8 @@ The app also still contains the original multitrack editor (**Edit**) and the **
 
 In **Edit**, use **Save project** to download an `.aeproj` file containing every timeline clip, its timing and settings, and the source audio. Use **Open project** to restore that file later, including on another browser or computer. Opening a project replaces the current timeline. The existing browser autosave still restores the last timeline when you return to the app.
 
+Select one or more timeline clips in **Editor** to split them into **2 layers** (drums + bass, vocals + other) or **4 stems** (drums, bass, other, vocals). Each selected clip is replaced by aligned clips on separate rows with its timing, trims, speed, volume, and fades preserved. Clips that share source audio are separated once; Undo restores the originals. The resulting stems are included when you save the project. Separation uses the local Demucs installation. **High quality** is selected by default in Editor; it uses `htdemucs_ft` with two shifted passes and can take substantially longer than **Standard** (`htdemucs`). The first high-quality run may download model weights. Both modes can leave some vocal bleed, depending on the recording.
+
 The **File** menu contains project and mix actions. Choose **Editor**, **Find loops**, or **Game song** in the mode selector. Keyboard shortcuts: **Space** plays or pauses, **S** splits at the playhead in Editor, **⌘←** returns to the start, **←/→** skips one second, and **Option+←/→** skips five seconds. Shortcuts leave text fields alone.
 
 ## Setup
@@ -27,7 +29,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Stem splitting, ratings and export run as Vite dev-server middleware under `/__game-song` (`server/gameSongPlugin.ts`), so they only work with `npm run dev`, not a static build. No environment variables are needed.
+Stem splitting, ratings and export run as Vite dev-server middleware under `/__game-song` and `/__editor-stems` (`server/gameSongPlugin.ts` and `server/editorStemPlugin.ts`), so they only work with `npm run dev`, not a static build. No environment variables are needed.
 
 | Script | Purpose |
 | --- | --- |

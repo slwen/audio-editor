@@ -4,6 +4,7 @@ import type { Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { gameSongPlugin } from './server/gameSongPlugin'
+import { editorStemPlugin } from './server/editorStemPlugin'
 
 const RATINGS_FILE = path.resolve(__dirname, 'loop-ratings.jsonl')
 
@@ -45,7 +46,7 @@ function loopRatingsPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), loopRatingsPlugin(), gameSongPlugin(__dirname)],
+  plugins: [react(), loopRatingsPlugin(), gameSongPlugin(__dirname), editorStemPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

@@ -1,6 +1,6 @@
 /**
- * Split a song into a drums+bass base layer and an everything-else top layer with local Demucs (htdemucs).
- * Writes <outDir>/base.wav and top.wav, 48 kHz stereo float, the same length as the original.
+ * Split a song with local Demucs (htdemucs) into either the existing base/top pair or
+ * four editor stems. Outputs are 48 kHz stereo float and match the source length.
  */
 import fs from 'node:fs'
 import os from 'node:os'
@@ -13,6 +13,12 @@ export const DEMUCS_INSTALL = 'python3 -m venv ~/.cache/audio-editor-demucs && ~
 export const demucsInstalled = () => fs.existsSync(DEMUCS_BIN)
 
 export const stemFiles = (outDir: string) => ({ base: path.join(outDir, 'base.wav'), top: path.join(outDir, 'top.wav') })
+export const EDITOR_STEMS = ['drums', 'bass', 'other', 'vocals'] as const
+export type EditorStem = typeof EDITOR_STEMS[number]
+export type StemLayout = 'two' | 'four'
+export type StemQuality = 'standard' | 'high'
+export const editorStemNames = (layout: StemLayout): readonly string[] =>
+  layout === 'two' ? ['base', 'top'] : EDITOR_STEMS
 
 /** Stems exist and are newer than the song they came from. */
 export function stemsReady(song: string, outDir: string): boolean {
@@ -73,33 +79,51 @@ function residualDb(original: Float32Array[], base: Float32Array[], top: Float32
 export type SplitProgress = { progress: number; message: string }
 
 /** Returns a one-line summary. `onProgress` gets 0..1 while Demucs runs, then the post-processing steps. */
-export async function splitStems(song: string, outDir: string, onProgress: (p: SplitProgress) => void = () => {}): Promise<string> {
+export async function splitStems(
+  song: string,
+  outDir: string,
+  onProgress: (p: SplitProgress) => void = () => {},
+  layout: StemLayout = 'two',
+  quality: StemQuality = 'standard'
+): Promise<string> {
   if (!demucsInstalled()) throw new Error(`Demucs is not installed (${DEMUCS_BIN}). Install it with:\n${DEMUCS_INSTALL}`)
   const started = Date.now()
   const separated = fs.mkdtempSync(path.join(os.tmpdir(), 'audio-editor-demucs-'))
   try {
-    onProgress({ progress: 0, message: 'Separating drums and bass from the rest' })
+    const model = quality === 'high' ? 'htdemucs_ft' : 'htdemucs'
+    const modelArgs = quality === 'high' ? ['--shifts', '2'] : []
+    onProgress({ progress: 0, message: `Separating with ${model}` })
     // none: the default rescale turns a stem down when it peaks over full scale, so the sum would no longer match the song.
-    await run(DEMUCS_BIN, ['-n', 'htdemucs', '-o', separated, '--float32', '--clip-mode', 'none', song], text => {
+    await run(DEMUCS_BIN, ['-n', model, ...modelArgs, '-o', separated, '--float32', '--clip-mode', 'none', song], text => {
       const matches = [...text.matchAll(/(\d{1,3})%\|/g)]
       const last = matches.at(-1)
-      if (last) onProgress({ progress: Math.min(1, Number(last[1]) / 100) * 0.9, message: 'Separating drums and bass from the rest' })
+      // The fine-tuned model is a four-model ensemble with a separate progress bar for each pass.
+      // Its percentage cannot be treated as the overall job percentage.
+      if (last && quality === 'standard') onProgress({ progress: Math.min(1, Number(last[1]) / 100) * 0.9, message: `Separating with ${model}` })
     })
-    onProgress({ progress: 0.9, message: 'Combining stems' })
+    onProgress({ progress: 0.9, message: layout === 'two' ? 'Combining stems' : 'Writing stems' })
     const original = await readStereo(song)
     const frames = original[0]!.length
-    // Float sum, not amix's default normalize, so a pair of stems is not halved.
     const stem = (name: string) => readStereo(findStem(separated, name))
-    const base = fitLength(add(await stem('drums'), await stem('bass')), frames)
-    const top = fitLength(add(await stem('other'), await stem('vocals')), frames)
     fs.mkdirSync(outDir, { recursive: true })
-    const files = stemFiles(outDir)
-    onProgress({ progress: 0.95, message: 'Writing stems' })
-    await writeStereoWav(files.base, base)
-    await writeStereoWav(files.top, top)
-    const residual = residualDb(original, base, top)
+    let residual: number | null = null
+    if (layout === 'two') {
+      // Float sum, not amix's default normalize, so a pair of stems is not halved.
+      const base = fitLength(add(await stem('drums'), await stem('bass')), frames)
+      const top = fitLength(add(await stem('other'), await stem('vocals')), frames)
+      const files = stemFiles(outDir)
+      onProgress({ progress: 0.95, message: 'Writing stems' })
+      await writeStereoWav(files.base, base)
+      await writeStereoWav(files.top, top)
+      residual = residualDb(original, base, top)
+    } else {
+      for (const [index, name] of EDITOR_STEMS.entries()) {
+        onProgress({ progress: 0.9 + index * 0.025, message: `Writing ${name}` })
+        await writeStereoWav(path.join(outDir, `${name}.wav`), fitLength(await stem(name), frames))
+      }
+    }
     const seconds = ((Date.now() - started) / 1000).toFixed(1)
-    return `${path.basename(song)}: ${frames} samples at ${STEM_SAMPLE_RATE} Hz; base + top − original is ${residual.toFixed(1)} dB; ${seconds}s -> ${outDir}`
+    return `${path.basename(song)}: ${frames} samples at ${STEM_SAMPLE_RATE} Hz; ${layout === 'two' ? `base + top − original is ${residual!.toFixed(1)} dB; ` : 'four stems; '}${seconds}s -> ${outDir}`
   } finally {
     fs.rmSync(separated, { recursive: true, force: true })
   }

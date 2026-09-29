@@ -7,6 +7,8 @@ import {
   type AudioExportFormat,
 } from '@/audio/exportWav'
 import { ExportFormatToggle } from '@/components/ExportFormatToggle'
+import { splitSelectedIntoLayers, type LayerSplitProgress, type LayerSplitQuality } from '@/editor/splitLayers'
+import type { LayerLayout } from '@/editor/layerPlan'
 import { clipTimelineDuration, clipTimelineEnd } from '@/lib/clipMath'
 import { downloadBlob } from '@/lib/downloadBlob'
 import { enterLoopModeFromSelection } from '@/loop/loopModeActions'
@@ -54,6 +56,11 @@ export function Inspector() {
   const isPlaying = useProjectStore((s) => s.isPlaying)
   const [exportFormat, setExportFormat] = useState<AudioExportFormat>('mp3')
   const [exporting, setExporting] = useState(false)
+  const [splitting, setSplitting] = useState<LayerLayout | null>(null)
+  const [splitQuality, setSplitQuality] = useState<LayerSplitQuality>('high')
+  const [splitProgress, setSplitProgress] = useState<LayerSplitProgress | null>(null)
+  const [splitMessage, setSplitMessage] = useState('')
+  const [splitError, setSplitError] = useState('')
 
   const selected = useMemo(
     () => clips.filter((c) => selection.includes(c.id)),
@@ -78,6 +85,17 @@ export function Inspector() {
     if (isPlaying) {
       audioEngine.updateClipGainLive(id, useProjectStore.getState().clips, v)
     }
+  }
+
+  const runLayerSplit = (layout: LayerLayout) => {
+    setSplitting(layout)
+    setSplitProgress(null)
+    setSplitMessage('')
+    setSplitError('')
+    void splitSelectedIntoLayers(layout, splitQuality, setSplitProgress)
+      .then(count => setSplitMessage(`Created ${count} aligned layer clips.`))
+      .catch((err: unknown) => setSplitError(err instanceof Error ? err.message : 'Could not split the selected clips.'))
+      .finally(() => setSplitting(null))
   }
 
   return (
@@ -159,6 +177,33 @@ export function Inspector() {
                 Find loops
               </button>
             )}
+          </div>
+
+          <div className="inspector__layer-split">
+            <p className="inspector__muted">Split selected clips into aligned audio layers. Timing, trims, speed and fades are preserved.</p>
+            <div className="field">
+              <span>Separation quality</span>
+              <div className="segmented segmented--compact" role="group" aria-label="Separation quality">
+                <button type="button" className={`btn btn--small btn--segment${splitQuality === 'standard' ? ' btn--segment-active' : ''}`}
+                  aria-pressed={splitQuality === 'standard'} disabled={splitting !== null}
+                  onClick={() => setSplitQuality('standard')}>Standard</button>
+                <button type="button" className={`btn btn--small btn--segment${splitQuality === 'high' ? ' btn--segment-active' : ''}`}
+                  aria-pressed={splitQuality === 'high'} disabled={splitting !== null}
+                  onClick={() => setSplitQuality('high')}>High quality</button>
+              </div>
+              <span className="field__hint">High quality uses a fine tuned model and two passes. It is much slower; the first run may download model weights.</span>
+            </div>
+            <div className="inspector__row">
+              <button type="button" className="btn btn--small" disabled={splitting !== null}
+                onClick={() => runLayerSplit('two')}>Split into 2 layers</button>
+              <button type="button" className="btn btn--small" disabled={splitting !== null}
+                onClick={() => runLayerSplit('four')}>Split into 4 stems</button>
+            </div>
+            {splitting && splitProgress && <p className="inspector__muted" role="status">
+              {splitProgress.sourceName} ({splitProgress.current}/{splitProgress.total}) · {splitQuality === 'standard' ? `${Math.round(splitProgress.progress * 100)}% · ` : ''}{splitProgress.message}
+            </p>}
+            {splitMessage && <p className="inspector__muted" role="status">{splitMessage}</p>}
+            {splitError && <p className="inspector__error" role="alert">{splitError}</p>}
           </div>
 
           {selected.length > 1 && (

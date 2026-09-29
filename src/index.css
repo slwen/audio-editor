@@ -417,6 +417,25 @@ body {
   align-items: stretch;
 }
 
+.inspector__layer-split {
+  margin: 0.7rem 0 0.9rem;
+  padding: 0.65rem;
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: 6px;
+}
+
+.inspector__layer-split .inspector__row {
+  margin: 0.55rem 0 0;
+}
+
+.inspector__error {
+  margin: 0.4rem 0 0;
+  color: var(--danger);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .field {
   display: flex;
   flex-direction: column;

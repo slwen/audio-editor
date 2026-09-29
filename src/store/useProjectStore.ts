@@ -9,6 +9,7 @@ import {
   clipTimelineEnd,
 } from '@/lib/clipMath'
 import { clearPeaks, removePeaks, setPeaksForBuffer } from '@/lib/peaksCache'
+import { planLayeredTimeline, type StemKind } from '@/editor/layerPlan'
 import {
   pickRandomAccentAvoiding,
   pickRandomTrackAccent,
@@ -95,6 +96,10 @@ type ProjectActions = {
   duplicateSelected: () => void
   /** Same start/row as source, new id, stacked above via `layerIndex`. */
   duplicateClipForDrag: (sourceId: ClipId) => ClipId | null
+  replaceSelectedWithLayers: (selectedIds: ClipId[], sources: {
+    sourceBufferId: BufferId
+    stems: { kind: StemKind; bufferId: BufferId; buffer: AudioBuffer; bytes: ArrayBuffer }[]
+  }[]) => number
   splitAt: (time: number, opts?: { onlyClipId?: ClipId; column?: boolean }) => void
   setClipGain: (id: ClipId, g: number) => void
   setAllClipGains: (g: number) => void
@@ -339,6 +344,29 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
     }
     set((s) => ({ clips: [...s.clips, dup] }))
     return dup.id
+  },
+
+  replaceSelectedWithLayers: (selectedIds, sources) => {
+    const current = get()
+    if (current.editorMode !== 'edit' || !selectedIds.length ||
+        selectedIds.some(id => !current.clips.some(c => c.id === id))) {
+      throw new Error('The selected clips changed. Select them and split again.')
+    }
+    const next = planLayeredTimeline(current.clips, current.bufferMeta, selectedIds,
+      sources.map(source => ({ sourceBufferId: source.sourceBufferId,
+        stems: source.stems.map(stem => ({ kind: stem.kind, bufferId: stem.bufferId,
+          durationSec: stem.buffer.duration })) })))
+    if (current.isPlaying) audioEngine.stop()
+    current.pushUndo()
+    for (const source of sources) {
+      for (const stem of source.stems) {
+        cacheBuffer(stem.bufferId, stem.buffer)
+        setPeaksForBuffer(stem.bufferId, stem.buffer)
+        rememberOriginalBytes(stem.bufferId, stem.bytes)
+      }
+    }
+    set({ ...next, isPlaying: false })
+    return next.selection.length
   },
 
   splitAt: (time, opts) =>
