@@ -94,8 +94,8 @@ type ProjectActions = {
   removeClip: (id: ClipId) => void
   deleteSelected: () => void
   duplicateSelected: () => void
-  /** Same start/row as source, new id, stacked above via `layerIndex`. */
-  duplicateClipForDrag: (sourceId: ClipId) => ClipId | null
+  /** Copies in place, above existing layers; returns source-to-copy ids. */
+  duplicateClipsForDrag: (sourceIds: ClipId[]) => Record<ClipId, ClipId>
   replaceSelectedWithLayers: (selectedIds: ClipId[], sources: {
     sourceBufferId: BufferId
     stems: { kind: StemKind; bufferId: BufferId; buffer: AudioBuffer; bytes: ArrayBuffer }[]
@@ -327,21 +327,30 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
     }))
   },
 
-  duplicateClipForDrag: (sourceId) => {
+  duplicateClipsForDrag: (sourceIds) => {
     const s0 = get()
-    const source = s0.clips.find((c) => c.id === sourceId)
-    if (!source) return null
-    const layers = s0.clips.filter((c) => c.row === source.row).map((c) => c.layerIndex)
-    const maxLayer = layers.length ? Math.max(...layers) : 0
-    const prevAccent = source.accentColor ?? stableAccentForClipId(source.id)
-    const dup: Clip = {
-      ...source,
-      id: crypto.randomUUID(),
-      layerIndex: maxLayer + 1,
-      accentColor: pickRandomAccentAvoiding(prevAccent),
+    const pickedIds = new Set(sourceIds)
+    const sources = s0.clips.filter((clip) => pickedIds.has(clip.id))
+      .sort((a, b) => a.layerIndex - b.layerIndex)
+    if (!sources.length) return {}
+    const maxLayerByRow = new Map<number, number>()
+    for (const clip of s0.clips) {
+      maxLayerByRow.set(clip.row, Math.max(maxLayerByRow.get(clip.row) ?? 0, clip.layerIndex))
     }
-    set((s) => ({ clips: [...s.clips, dup] }))
-    return dup.id
+    const copyIds: Record<ClipId, ClipId> = {}
+    const copies = sources.map((source) => {
+      const id = crypto.randomUUID()
+      const layerIndex = (maxLayerByRow.get(source.row) ?? 0) + 1
+      maxLayerByRow.set(source.row, layerIndex)
+      copyIds[source.id] = id
+      return {
+        ...source, id, layerIndex,
+        accentColor: pickRandomAccentAvoiding(source.accentColor ?? stableAccentForClipId(source.id)),
+      }
+    })
+    get().pushUndo()
+    set((s) => ({ clips: [...s.clips, ...copies], selection: copies.map((clip) => clip.id) }))
+    return copyIds
   },
 
   replaceSelectedWithLayers: (selectedIds, sources) => {

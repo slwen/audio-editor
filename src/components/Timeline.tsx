@@ -44,8 +44,6 @@ type DragClip = {
   pointerId: number
   startClientX: number
   startClientY: number
-  origStart: number
-  origRow: number
   hasMoved: boolean
   /** Alt+drag on clip: source id until duplicate is created, then `id` is the copy. */
   altDupSourceId?: ClipId
@@ -90,7 +88,7 @@ export function Timeline() {
   const updateClip = useProjectStore((s) => s.updateClip)
   const pushUndo = useProjectStore((s) => s.pushUndo)
   const splitAt = useProjectStore((s) => s.splitAt)
-  const duplicateClipForDrag = useProjectStore((s) => s.duplicateClipForDrag)
+  const duplicateClipsForDrag = useProjectStore((s) => s.duplicateClipsForDrag)
 
   const clipsDrawOrder = useMemo(() => clipsSortedForDraw(clips), [clips])
   const clipsHitOrder = useMemo(() => clipsSortedForHitTest(clips), [clips])
@@ -337,38 +335,7 @@ export function Timeline() {
     const x = e.clientX - rect.left
     const t = Math.max(0, xt(x))
 
-    if (e.altKey && y >= RULER_H) {
-      if (hit) {
-        if (e.shiftKey && anchorRef.current) {
-          selectRangeFromAnchor(anchorRef.current, hit.id)
-        } else if (e.shiftKey) {
-          toggleSelect(hit.id)
-          anchorRef.current = hit.id
-        } else {
-          selectOnly(hit.id)
-          anchorRef.current = hit.id
-        }
-        dragRef.current = {
-          id: hit.id,
-          dragIds: [hit.id],
-          origById: { [hit.id]: { startTime: hit.startTime, row: hit.row } },
-          pointerId: e.pointerId,
-          startClientX: e.clientX,
-          startClientY: e.clientY,
-          origStart: hit.startTime,
-          origRow: hit.row,
-          hasMoved: false,
-          altDupSourceId: hit.id,
-          altDupCreated: false,
-        }
-        previewByIdRef.current = null
-        hoverLocalXRef.current = null
-        syncHoverDom()
-        canvas.setPointerCapture(e.pointerId)
-        canvas.style.cursor = 'grabbing'
-        requestDraw()
-        return
-      }
+    if (e.altKey && !hit && y >= RULER_H) {
       pushUndo()
       splitAt(t, { column: true })
       void seekToTimelineTime(t)
@@ -404,9 +371,9 @@ export function Timeline() {
         pointerId: e.pointerId,
         startClientX: e.clientX,
         startClientY: e.clientY,
-        origStart: hit.startTime,
-        origRow: hit.row,
         hasMoved: false,
+        altDupSourceId: e.altKey ? hit.id : undefined,
+        altDupCreated: false,
       }
       previewByIdRef.current = null
       hoverLocalXRef.current = null
@@ -460,8 +427,8 @@ export function Timeline() {
       if (!d.hasMoved && Math.hypot(dx, dy) < DRAG_START_PX) return
       d.hasMoved = true
       if (d.altDupSourceId && !d.altDupCreated) {
-        pushUndo()
-        const newId = duplicateClipForDrag(d.altDupSourceId)
+        const copyIds = duplicateClipsForDrag(d.dragIds)
+        const newId = copyIds[d.altDupSourceId]
         if (!newId) {
           dragRef.current = null
           previewByIdRef.current = null
@@ -471,10 +438,14 @@ export function Timeline() {
           return
         }
         d.id = newId
-        d.dragIds = [newId]
-        d.origById = { [newId]: { startTime: d.origStart, row: d.origRow } }
+        const copyOrigins: DragClip['origById'] = {}
+        for (const sourceId of d.dragIds) {
+          const copyId = copyIds[sourceId]
+          if (copyId && d.origById[sourceId]) copyOrigins[copyId] = d.origById[sourceId]
+        }
+        d.dragIds = Object.keys(copyOrigins)
+        d.origById = copyOrigins
         d.altDupCreated = true
-        selectOnly(newId)
         anchorRef.current = newId
       }
       const stateNow = useProjectStore.getState()
@@ -563,7 +534,7 @@ export function Timeline() {
           updates.push({ id, startTime: drop.startTime, row: drop.row })
         }
         if (updates.length) {
-          pushUndo()
+          if (!d.altDupCreated) pushUndo()
           for (const up of updates) updateClip(up.id, { startTime: up.startTime, row: up.row })
         }
       }
