@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { extractMonoForAnalysis } from '@/loop/detectLoops'
 
 const SOURCE_SAMPLE_RATE = Number(process.env.LOOP_SOURCE_SAMPLE_RATE ?? 48000)
@@ -15,7 +16,8 @@ export function decodeForAnalysis(file: string): { samples: Float32Array; sample
 function decodeStereo(file: string): { channels: Float32Array[]; sampleRate: number } {
   const cache = path.join(os.tmpdir(), 'audio-editor-decode')
   fs.mkdirSync(cache, { recursive: true })
-  const out = path.join(cache, `${path.basename(file).replace(/\.[^.]+$/, '')}.${SOURCE_SAMPLE_RATE}.stereo.f32`)
+  const key = createHash('sha1').update(path.resolve(file)).digest('hex').slice(0, 12)
+  const out = path.join(cache, `${path.basename(file).replace(/\.[^.]+$/, '')}.${key}.${SOURCE_SAMPLE_RATE}.stereo.f32`)
   if (!fs.existsSync(out) || fs.statSync(out).mtimeMs < fs.statSync(file).mtimeMs) {
     execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-ac', '2', '-ar', String(SOURCE_SAMPLE_RATE), '-f', 'f32le', out])
   }

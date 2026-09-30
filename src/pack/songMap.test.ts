@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { buildTransitionModel, extractHopFeatures, scoreJump } from '@/loop/detectLoops'
-import { analyzeSongMap, BEATS_PER_BAR } from './songMap'
+import { analyzeSongMap, BEATS_PER_BAR, trackBeats } from './songMap'
 
 const SR = 8000
 const BEAT_SEC = 0.5
@@ -35,10 +35,28 @@ it('scores a jump by whether both sides match, in either direction', () => {
   expect(backwardWithinA).toBeGreaterThan(intoB + 0.1)
 })
 
-it('lists only meter-preserving jumps on one tempo grid', () => {
+it('tracks beats that drift off the global tempo', () => {
+  // 120 BPM for 30 s, then 0.5% faster: a fixed grid is 75 ms out by the end.
+  const beatAt = (k: number) => k <= 60 ? k * BEAT_SEC : 30 + (k - 60) * BEAT_SEC / 1.005
+  const samples = new Float32Array(SR * 60)
+  const truth: number[] = []
+  for (let k = 0; beatAt(k) < 59.9; k++) {
+    truth.push(beatAt(k))
+    const start = Math.round(beatAt(k) * SR)
+    for (let i = 0; i < SR * 0.03 && start + i < samples.length; i++) samples[start + i] = Math.sin(i * 0.9) * Math.exp(-i / SR * 150)
+  }
+  const { flux, hopSec } = extractHopFeatures(samples, SR)
+  const beats = trackBeats(flux, hopSec, 120, 60)
+  // Onset frames lag the audio by a constant; only a change in that lag moves a wrap.
+  const offset = (t: number) => beats.reduce((best, b) => Math.abs(b - t) < Math.abs(best - t) ? b : best, Infinity) - t
+  const early = offset(10)
+  for (const t of truth.filter(t => t > 40 && t < 58)) expect(Math.abs(offset(t) - early)).toBeLessThan(0.02)
+})
+
+it('lists only meter-preserving jumps on the beat grid', () => {
   const map = analyzeSongMap({ samples: abaSong(), sampleRate: SR, jumpsPerExit: 4 })
   expect(map.bpm).toBeCloseTo(120, 0)
-  expect(map.beatsSec[1]! - map.beatsSec[0]!).toBeCloseTo(BEAT_SEC, 2)
+  expect((map.beatsSec.at(-1)! - map.beatsSec[0]!) / (map.beatsSec.length - 1)).toBeCloseTo(BEAT_SEC, 2)
   expect(map.jumps.length).toBeGreaterThan(0)
   for (const jump of map.jumps) {
     expect(Math.abs(jump.exitBeat - jump.entryBeat) % BEATS_PER_BAR).toBe(0)

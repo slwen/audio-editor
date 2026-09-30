@@ -1,4 +1,4 @@
-import { estimateBeatOffsetSec, type FrameFeatures } from '@/loop/detectLoops'
+import type { FrameFeatures } from '@/loop/detectLoops'
 import { jumpContext, jumpFeatures, withFade, type JumpContext } from './jumpFeatures'
 import { predictGood, type JumpModel } from './jumpModel'
 import { TRAINED_JUMP_MODEL } from './trainedJumpModel'
@@ -47,7 +47,7 @@ export type SongMap = {
   durationSec: number
   sampleRate: number
   bpm: number
-  /** One global-tempo grid; the detector's rated loops were cut on this grid. */
+  /** Tracked beats; they follow small tempo drift. */
   beatsSec: number[]
   /** Heuristic: beat index of the first bar line. Check it against listening before relying on phrasing. */
   downbeatBeat: number
@@ -130,12 +130,60 @@ export type SongGrid = {
   bars: SongBar[]
 }
 
-/** One global-tempo beat grid, its heuristic downbeat and per-bar features. */
+/** Higher holds the beat period closer to the global tempo; librosa's default. */
+const BEAT_TIGHTNESS = 100
+
+/**
+ * Beats that follow the onsets (Ellis 2007 dynamic programming), seeded with the global tempo. A song that drifts
+ * even 0.2% off one fixed grid is 100 ms out after a minute, which breaks every wrap that crosses the drift.
+ */
+export function trackBeats(flux: Float32Array, hopSec: number, bpm: number, durationSec: number): number[] {
+  const n = flux.length
+  const period = 60 / bpm / hopSec
+  let sumSq = 0
+  for (let i = 0; i < n; i++) sumSq += flux[i]! * flux[i]!
+  const std = Math.sqrt(sumSq / Math.max(1, n)) || 1
+  const radius = Math.max(1, Math.round(period / 32))
+  const local = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    let s = 0
+    for (let k = -radius; k <= radius; k++) {
+      const v = flux[i + k]
+      if (v !== undefined) s += (v / std) * Math.exp(-0.5 * (k / radius) ** 2)
+    }
+    local[i] = s
+  }
+  const lo = Math.max(1, Math.round(period * 0.8))
+  const hi = Math.round(period * 1.25)
+  const score = new Float64Array(n)
+  const prev = new Int32Array(n).fill(-1)
+  for (let i = 0; i < n; i++) {
+    let best = 0
+    for (let d = lo; d <= hi && i - d >= 0; d++) {
+      const v = score[i - d]! - BEAT_TIGHTNESS * Math.log(d / period) ** 2
+      if (prev[i] === -1 || v > best) { best = v; prev[i] = i - d }
+    }
+    score[i] = local[i]! + best
+  }
+  let end = Math.max(0, n - Math.ceil(period))
+  for (let i = end; i < n; i++) if (score[i]! > score[end]!) end = i
+  const hops: number[] = []
+  for (let i = end; i >= 0; i = prev[i]!) hops.push(i)
+  hops.reverse()
+  return hops.map(i => {
+    const a = local[i - 1] ?? local[i]!
+    const b = local[i]!
+    const c = local[i + 1] ?? local[i]!
+    const curve = a - 2 * b + c
+    const shift = curve < 0 ? Math.max(-0.5, Math.min(0.5, (a - c) / (2 * curve))) : 0
+    return (i + shift) * hopSec
+  }).filter(t => t >= 0 && t <= durationSec - 0.1)
+}
+
+/** A tracked beat grid, its heuristic downbeat and per-bar features. */
 export function songGrid(ctx: JumpContext, durationSec: number): SongGrid {
   const { flux, frames, hopSec, bpm } = ctx
-  const beatSec = 60 / bpm
-  const beatsSec: number[] = []
-  for (let t = estimateBeatOffsetSec(flux, hopSec, bpm); t <= durationSec - 0.1; t += beatSec) beatsSec.push(t)
+  const beatsSec = trackBeats(flux, hopSec, bpm, durationSec)
   const downbeat = estimateDownbeat(frames, hopSec, beatsSec)
   const bars: SongBar[] = []
   for (let startBeat = downbeat.beat; startBeat + BEATS_PER_BAR < beatsSec.length; startBeat += BEATS_PER_BAR) {
