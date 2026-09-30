@@ -7,14 +7,14 @@ import {
   clipsSortedForDraw,
   clipsSortedForHitTest,
   fadeMultiplier,
-  sourceTimeAtTimelineTime,
 } from '@/lib/clipMath'
 import { getPeaks } from '@/lib/peaksCache'
 import { rulerStepSeconds } from '@/lib/rulerTicks'
-import { edgeSnapStart } from '@/lib/snap'
+import { snapClipDragDelta } from '@/lib/snap'
 import { readCssColor, withAlpha } from '@/lib/themeCanvas'
 import { maxTimelineScrollPx, scrollForPlayheadCentered, TIMELINE_PAD_L } from '@/lib/timelineScroll'
 import { clipAccentHex } from '@/lib/trackAccent'
+import { waveformColumns } from '@/lib/waveform'
 import { seekToTimelineTime } from '@/playback/playbackActions'
 import { useProjectStore } from '@/store/useProjectStore'
 import type { Clip, ClipId } from '@/types'
@@ -22,7 +22,6 @@ import type { Clip, ClipId } from '@/types'
 const ROW_H = 72
 const RULER_H = 28
 const DRAG_START_PX = 3
-const DRAG_STEP_SEC = 0.1
 
 /** Map wheel delta to a zoom multiplier (⌃/⌘+wheel / pinch). */
 function zoomFactorFromWheel(e: WheelEvent): number {
@@ -59,23 +58,6 @@ type Marquee = {
   y0: number
   x1: number
   y1: number
-}
-
-function resolveDraggedClipStart(
-  clips: Clip[],
-  baseClip: Clip,
-  start: number,
-  row: number,
-  snapOn: boolean,
-  pps: number
-): number {
-  const s = Math.max(0, start)
-  if (!snapOn) return s
-  return edgeSnapStart(clips, { ...baseClip, startTime: s, row }, s, pps)
-}
-
-function quantizeTimelineStep(t: number): number {
-  return Math.round(t / DRAG_STEP_SEC) * DRAG_STEP_SEC
 }
 
 export function Timeline() {
@@ -232,28 +214,25 @@ export function Timeline() {
       const buf = getCachedBuffer(c.bufferId)
       const peaks = getPeaks(c.bufferId)
       if (buf && peaks && peaks.length >= 2) {
-        const buckets = peaks.length / 2
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(x0, y0, dur * pps, ch)
+        ctx.clip()
         ctx.strokeStyle = withAlpha(accent, 0.88)
         ctx.lineWidth = 1
         ctx.beginPath()
         const mid = y0 + ch / 2
         const endT = clipTimelineEnd(cc)
-        const firstPixel = Math.max(0, Math.ceil(-x0))
-        const lastPixel = Math.min(Math.ceil(cw), Math.ceil(w - x0))
-        for (let ix = firstPixel; ix < lastPixel; ix++) {
-          const frac = cw <= 1 ? 0 : ix / (cw - 1)
-          const tLine = Math.min(endT, Math.max(start, start + frac * dur))
-          const srcT = sourceTimeAtTimelineTime(cc, tLine)
-          const u = srcT / buf.duration
-          const bi = Math.max(0, Math.min(buckets - 1, Math.floor(u * buckets)))
-          const mn = peaks[bi * 2] ?? 0
-          const mx = peaks[bi * 2 + 1] ?? 0
+        for (const column of waveformColumns(peaks, buf.duration, cc, pps, -x0, w - x0)) {
+          const tLine = start + Math.max(0, column.x) / pps
           const fadeMul = fadeMultiplier(cc, tLine, endT)
-          const amp = Math.max(Math.abs(mn), Math.abs(mx)) * (ch / 2) * 0.85 * fadeMul
-          ctx.moveTo(x0 + ix, mid - amp)
-          ctx.lineTo(x0 + ix, mid + amp)
+          const amp = Math.max(Math.abs(column.min), Math.abs(column.max)) * (ch / 2) * 0.85 * fadeMul
+          // Draw at the column center so a fractional cut does not drop the edge column.
+          ctx.moveTo(x0 + column.x + 0.5, mid - amp)
+          ctx.lineTo(x0 + column.x + 0.5, mid + amp)
         }
         ctx.stroke()
+        ctx.restore()
       }
 
       ctx.fillStyle = css('--ui-text', '#ececee')
@@ -498,7 +477,8 @@ export function Timeline() {
         selectOnly(newId)
         anchorRef.current = newId
       }
-      const clipsNow = useProjectStore.getState().clips
+      const stateNow = useProjectStore.getState()
+      const clipsNow = stateNow.clips
       const c = clipsNow.find((x) => x.id === d.id)
       if (!c) {
         requestDraw()
@@ -509,19 +489,20 @@ export function Timeline() {
         requestDraw()
         return
       }
-      const rawStart = Math.max(0, quantizeTimelineStep(d.origStart + dx / pps))
       let rowShift = Math.round(dy / ROW_H)
       const minOrigRow = Math.min(...groupIds.map((id) => d.origById[id]!.row))
       if (minOrigRow + rowShift < 0) rowShift = -minOrigRow
-      const minOrigStart = Math.min(...groupIds.map((id) => d.origById[id]!.startTime))
-      let deltaStart = rawStart - d.origStart
-      if (minOrigStart + deltaStart < 0) deltaStart = -minOrigStart
-      const anchorRawStart = d.origStart + deltaStart
-      const newRow = Math.max(0, d.origRow + rowShift)
       const snapOn = !(e.metaKey || e.ctrlKey)
-      const staticClips = clipsNow.filter((x) => !groupIds.includes(x.id))
-      const newStart = resolveDraggedClipStart(staticClips, c, anchorRawStart, newRow, snapOn, pps)
-      deltaStart = newStart - d.origStart
+      const movingClips = clipsNow
+        .filter((clip) => groupIds.includes(clip.id))
+        .map((clip) => ({
+          ...clip,
+          startTime: d.origById[clip.id]!.startTime,
+          row: d.origById[clip.id]!.row + rowShift,
+        }))
+      const deltaStart = snapClipDragDelta(
+        clipsNow, movingClips, dx / pps, pps, stateNow.playhead, snapOn
+      )
       const nextPreview: Record<ClipId, { startTime: number; row: number }> = {}
       for (const id of groupIds) {
         const orig = d.origById[id]
