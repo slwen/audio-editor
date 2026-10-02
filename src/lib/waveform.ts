@@ -5,7 +5,7 @@ import type { Clip } from '@/types'
 export function* waveformColumns(
   peaks: Float32Array,
   bufferDuration: number,
-  clip: Clip,
+  clip: Pick<Clip, 'trimStart' | 'trimEnd' | 'speed'>,
   pixelsPerSecond: number,
   visibleStartPx: number,
   visibleEndPx: number,

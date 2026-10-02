@@ -16,7 +16,7 @@ export function clampFadeSeconds(sec: number): number {
   return Math.max(0, Math.min(60, sec))
 }
 
-export function clipTimelineDuration(clip: Clip): number {
+export function clipTimelineDuration(clip: Pick<Clip, 'trimStart' | 'trimEnd' | 'speed'>): number {
   const src = Math.max(0, clip.trimEnd - clip.trimStart)
   const sp = clampPlaybackSpeed(clip.speed)
   return src / sp

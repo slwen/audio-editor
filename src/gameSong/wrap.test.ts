@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { blendSec, clampFade, fadeCurve, fadeGain, sourceTimeAt } from './wrap'
+import { blendSec, clampFade, fadeCurve, fadeGain, songSplitParts, sourceTimeAt } from './wrap'
 
 describe('fadeGain', () => {
   it('is equal-power for real blends', () => {
@@ -36,6 +36,18 @@ describe('sourceTimeAt', () => {
     expect(sourceTimeAt(loop, 3)).toBe(3)
     expect(sourceTimeAt(loop, 7)).toBe(3)
     expect(sourceTimeAt(loop, 11)).toBe(3)
+  })
+})
+
+describe('songSplitParts', () => {
+  it('cuts the song at the wrap and drops empty ends', () => {
+    expect(songSplitParts(10, 2, 8)).toEqual([
+      { from: 0, to: 2, label: 'lead-in' },
+      { from: 2, to: 8, label: 'loop' },
+      { from: 8, to: 10, label: 'lead-out' },
+    ])
+    expect(songSplitParts(10, 0, 10)).toEqual([{ from: 0, to: 10, label: 'loop' }])
+    expect(songSplitParts(10, -1, 12)).toEqual([{ from: 0, to: 10, label: 'loop' }])
   })
 })
 

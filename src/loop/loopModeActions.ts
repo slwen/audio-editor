@@ -417,3 +417,38 @@ export function addSelectedLoopsToTimeline(candidateIds?: string[]): void {
   if (ids.length) st.setSelection(ids)
   exitLoopMode()
 }
+
+/** One row per loop: the untouched source region, split into lead-in, loop and lead-out clips. */
+export function addSelectedLoopsWithSongToTimeline(candidateIds?: string[]): void {
+  const loop = useLoopStore.getState()
+  const st = useProjectStore.getState()
+  const selected = loop.candidates.filter((c) => (candidateIds ?? loop.selectedIds).includes(c.id))
+  if (selected.length === 0) return
+  stopPlayback()
+  st.pushUndo()
+  const maxRow = st.clips.reduce((m, c) => Math.max(m, c.row), -1)
+  const loopIds: string[] = []
+  selected.forEach((c, i) => {
+    const parts: { from: number; to: number; label: string; isLoop: boolean }[] = [
+      { from: loop.trimStart, to: c.startSec, label: 'lead-in', isLoop: false },
+      { from: c.startSec, to: c.endSec, label: `loop ${i + 1} (${c.bars} bar)`, isLoop: true },
+      { from: c.endSec, to: loop.trimEnd, label: 'lead-out', isLoop: false },
+    ]
+    let startTime = 0
+    for (const part of parts) {
+      if (part.to - part.from < 1e-3) continue
+      const id = st.addClipOnExistingBuffer({
+        bufferId: loop.bufferId,
+        label: `${loop.sourceName} ${part.label}`,
+        startTime,
+        row: maxRow + 1 + i,
+        trimStart: part.from,
+        trimEnd: part.to,
+      })
+      if (id && part.isLoop) loopIds.push(id)
+      startTime += part.to - part.from
+    }
+  })
+  if (loopIds.length) st.setSelection(loopIds)
+  exitLoopMode()
+}

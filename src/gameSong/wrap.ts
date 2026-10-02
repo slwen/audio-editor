@@ -56,6 +56,20 @@ export function clampFade(loop: SongLoop, durationSec: number): number {
   return Math.max(0, Math.min(loop.fadeSec, room))
 }
 
+export type SongSplitLabel = 'lead-in' | 'loop' | 'lead-out'
+
+/** The whole song cut at the wrap: before the entry, the loop, and after the exit. */
+export function songSplitParts(durationSec: number, startSec: number, endSec: number): { from: number; to: number; label: SongSplitLabel }[] {
+  const duration = Math.max(0, durationSec)
+  const start = Math.min(Math.max(0, startSec), duration)
+  const end = Math.min(Math.max(start, endSec), duration)
+  const parts: { from: number; to: number; label: SongSplitLabel }[] = []
+  if (start >= 1e-3) parts.push({ from: 0, to: start, label: 'lead-in' })
+  if (end - start >= 1e-3) parts.push({ from: start, to: end, label: 'loop' })
+  if (duration - end >= 1e-3) parts.push({ from: end, to: duration, label: 'lead-out' })
+  return parts
+}
+
 /** Source position heard at output time `t` (ignoring the crossfade overlap), for the playhead. */
 export function sourceTimeAt(loop: SongLoop, t: number): number {
   const period = loop.endSec - loop.startSec

@@ -12,7 +12,7 @@ import { getPeaks } from '@/lib/peaksCache'
 import { rulerStepSeconds } from '@/lib/rulerTicks'
 import { snapClipDragDelta } from '@/lib/snap'
 import { readCssColor, withAlpha } from '@/lib/themeCanvas'
-import { maxTimelineScrollPx, scrollForPlayheadCentered, TIMELINE_PAD_L } from '@/lib/timelineScroll'
+import { clampPixelsPerSecond, maxTimelineScrollPx, scrollForPlayheadCentered, TIMELINE_PAD_L } from '@/lib/timelineScroll'
 import { clipAccentHex } from '@/lib/trackAccent'
 import { waveformColumns } from '@/lib/waveform'
 import { seekToTimelineTime } from '@/playback/playbackActions'
@@ -304,7 +304,7 @@ export function Timeline() {
         const localX = rect ? e.clientX - rect.left : cw / 2
         const factor = zoomFactorFromWheel(e)
         const pps0 = st.pixelsPerSecond
-        const pps1 = Math.max(10, Math.min(500, pps0 * factor))
+        const pps1 = clampPixelsPerSecond(pps0 * factor)
         if (pps1 === pps0) return
         const anchor = localX - TIMELINE_PAD_L
         const t = (anchor + st.scrollX) / pps0

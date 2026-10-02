@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, Check, Copy, Download, Play, Scissors, SkipForward, Square, ThumbsDown, ThumbsUp, Upload } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, Copy, Download, Play, Scissors, SkipForward, Square, ThumbsDown, ThumbsUp, Upload } from 'lucide-react'
 import {
   chooseSuggestion,
   currentFadeSec,
@@ -16,6 +16,7 @@ import {
   nudgeMarker,
   rateWrap,
   selectSong,
+  sendSongToEditor,
   setBlend,
   setCalmLevel,
   setExportField,
@@ -268,6 +269,7 @@ function LoopStep({ state }: { state: StepState }) {
 function ExportStep({ state }: { state: StepState }) {
   const s = useGameSongStore()
   const idOk = isSongId(s.id.trim())
+  const [sending, setSending] = useState(false)
   return (
     <section className={`gs-step${state === 'locked' ? ' gs-step--locked' : ''}`}>
       <StepHeading n={4} title="Export to the game" state={state} />
@@ -307,7 +309,13 @@ function ExportStep({ state }: { state: StepState }) {
               <button type="button" className="btn" disabled={!idOk || s.exporting} onClick={() => void downloadZip()}>
                 <Download size={16} /> Download ZIP
               </button>
+              <button type="button" className="btn" disabled={s.exporting || sending}
+                title="Open the full song in the editor, already split at the wrap"
+                onClick={() => { setSending(true); void sendSongToEditor().finally(() => setSending(false)) }}>
+                <ArrowRight size={16} /> Send to editor
+              </button>
               {s.exporting && <span className="gs-muted">Exporting… (matching loudness and encoding, about 10 s)</span>}
+              {sending && <span className="gs-muted">Sending to the editor…</span>}
             </div>
             {s.exportError && <p className="gs-error">{s.exportError}</p>}
             {s.exported && (

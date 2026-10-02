@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { getOriginalBytes } from '@/persistence/fileBytes'
+import { useProjectStore } from '@/store/useProjectStore'
 import { initialSongState, useGameSongStore } from './store'
-import { exitGameSongMode, moveMarkerToBoundary, selectSong } from './actions'
+import { exitGameSongMode, moveMarkerToBoundary, selectSong, sendSongToEditor } from './actions'
 import { analyzeStems, cancelStemAnalysis } from './analysisClient'
 
 const mocks = vi.hoisted(() => {
@@ -62,4 +64,36 @@ it('keeps Home/End marker movement on valid grid points with a nonempty loop', (
   expect(useGameSongStore.getState().loop).toEqual({ startSec: 0, endSec: 1 })
   moveMarkerToBoundary('end', true)
   expect(useGameSongStore.getState().loop.endSec).toBe(9)
+})
+
+it('sends both stems to the editor, split at the selected wrap', async () => {
+  useProjectStore.getState().resetProject()
+  useProjectStore.setState({
+    clips: [{
+      id: 'old', bufferId: 'old-buf', startTime: 0, row: 3, layerIndex: 0,
+      trimStart: 0, trimEnd: 1, gain: 1, fadeInSec: 0, fadeOutSec: 0, speed: 1,
+    }],
+    bufferMeta: [{ id: 'old-buf', name: 'old', durationSec: 1 }],
+  })
+  await selectSong('cached.wav')
+  useGameSongStore.setState({ loop: { startSec: 2, endSec: 8 }, title: 'Cathedral' })
+  await sendSongToEditor()
+  const st = useProjectStore.getState()
+  const added = st.clips.filter(c => c.id !== 'old').sort((a, b) => a.row - b.row || a.startTime - b.startTime)
+  expect(st.editorMode).toBe('edit')
+  expect(st.playhead).toBe(2)
+  expect(st.scrollX).toBe(2 * st.pixelsPerSecond - 120)
+  expect(added.map(c => [c.row, c.startTime, c.trimStart, c.trimEnd, c.label])).toEqual([
+    [4, 0, 0, 2, 'Cathedral · Drums + bass · lead-in'],
+    [4, 2, 2, 8, 'Cathedral · Drums + bass · loop'],
+    [4, 8, 8, 10, 'Cathedral · Drums + bass · lead-out'],
+    [5, 0, 0, 2, 'Cathedral · Vocals + other · lead-in'],
+    [5, 2, 2, 8, 'Cathedral · Vocals + other · loop'],
+    [5, 8, 8, 10, 'Cathedral · Vocals + other · lead-out'],
+  ])
+  expect(st.selection).toEqual(added.filter(c => c.label?.endsWith(' · loop')).map(c => c.id))
+  for (const id of new Set(added.map(c => c.bufferId))) expect(getOriginalBytes(id)?.byteLength).toBe(8)
+  st.undo()
+  expect(useProjectStore.getState().clips.map(c => c.id)).toEqual(['old'])
+  useProjectStore.getState().resetProject()
 })

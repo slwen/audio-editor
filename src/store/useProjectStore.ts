@@ -9,6 +9,7 @@ import {
   clipTimelineEnd,
 } from '@/lib/clipMath'
 import { clearPeaks, retainPeaks, setPeaksForBuffer } from '@/lib/peaksCache'
+import { clampPixelsPerSecond } from '@/lib/timelineScroll'
 import { planLayeredTimeline, type StemKind } from '@/editor/layerPlan'
 import {
   pickRandomAccentAvoiding,
@@ -162,7 +163,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
   setPlayhead: (t) => set({ playhead: Math.max(0, t) }),
   setIsPlaying: (v) => set({ isPlaying: v }),
   setMasterGain: (g) => set({ masterGain: clampLinearGain(g) }),
-  setPixelsPerSecond: (pps) => set({ pixelsPerSecond: Math.max(10, Math.min(500, pps)) }),
+  setPixelsPerSecond: (pps) => set({ pixelsPerSecond: clampPixelsPerSecond(pps) }),
   setScrollX: (x) => { const next = Math.max(0, x); if (next !== get().scrollX) set({ scrollX: next }) },
 
   selectOnly: (id) => set({ selection: id ? [id] : [] }),
@@ -399,7 +400,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
         const srcT = c.trimStart + (time - c.startTime) * sp
         if (srcT <= c.trimStart + 1e-4 || srcT >= c.trimEnd - 1e-4) continue
         const [acLeft, acRight] = pickTwoDistinctTrackAccents()
-        const left: Clip = { ...c, trimEnd: srcT, accentColor: acLeft }
+        const left: Clip = { ...c, trimEnd: srcT, fadeOutSec: 0, accentColor: acLeft }
         const right: Clip = {
           ...c,
           id: crypto.randomUUID(),
@@ -407,6 +408,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>((set, get) 
           trimStart: srcT,
           trimEnd: c.trimEnd,
           layerIndex: c.layerIndex,
+          fadeInSec: 0,
           accentColor: acRight,
         }
         toRemove.add(c.id)

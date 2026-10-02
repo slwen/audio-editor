@@ -89,3 +89,13 @@ it('ignores missing or repeated source ids without creating extra copies or empt
   expect(Object.keys(store.duplicateClipsForDrag([id, id, 'missing']))).toEqual([id])
   expect(useProjectStore.getState().clips).toHaveLength(2)
 })
+
+it('keeps each fade on its outer edge when splitting so the cut stays seamless', () => {
+  const store = useProjectStore.getState()
+  const id = store.addClipFromBuffer(buffer, 'audio.wav', 0, 0)
+  store.updateClip(id, { fadeInSec: 0.2, fadeOutSec: 0.3 })
+  store.splitAt(0.5, { onlyClipId: id })
+  const [left, right] = [...useProjectStore.getState().clips].sort((a, b) => a.startTime - b.startTime)
+  expect([left!.fadeInSec, left!.fadeOutSec]).toEqual([0.2, 0])
+  expect([right!.fadeInSec, right!.fadeOutSec]).toEqual([0, 0.3])
+})

@@ -4,6 +4,7 @@ import { getCachedBuffer } from '@/audio/bufferCache'
 import { effectiveLoopCrossfadeSec } from '@/loop/wrapLoop'
 import {
   addSelectedLoopsToTimeline,
+  addSelectedLoopsWithSongToTimeline,
   exportSelectedLoops,
   fitSelectedToBars,
   resizeSelectedLoop,
@@ -278,6 +279,7 @@ export function LoopInspector() {
             finally { setExporting(false) }
           }}>{exporting ? 'Exporting…' : `Export loop pack (${selected.length})`}</button>
           <button type="button" className="btn btn--small" disabled={!selected.length || status !== 'ready'} onClick={() => addSelectedLoopsToTimeline(selected.map(c => c.id))}>Copy to timeline</button>
+          <button type="button" className="btn btn--small" disabled={!selected.length || status !== 'ready'} title="Copy the whole song, split at the loop start and end" onClick={() => addSelectedLoopsWithSongToTimeline(selected.map(c => c.id))}>Copy with full song</button>
         </div>
         {exportError && <p role="alert">{exportError}</p>}
         <div className="inspector__row">

@@ -1,8 +1,11 @@
 import { audioEngine } from '@/audio/AudioEngine'
+import { cacheBuffer } from '@/audio/bufferCache'
+import { STEM_LABELS } from '@/editor/layerPlan'
 import { downloadBlob } from '@/lib/downloadBlob'
 import { peaksForBufferAsync } from '@/lib/peaks'
+import { setPeaksForBuffer } from '@/lib/peaksCache'
 import { createLoopArchive } from '@/loop/loopArchive'
-import { getOriginalBytes } from '@/persistence/fileBytes'
+import { getOriginalBytes, rememberOriginalBytes } from '@/persistence/fileBytes'
 import { useProjectStore } from '@/store/useProjectStore'
 import { analyzeStems, cancelStemAnalysis, rerankSuggestions, scoreWrap } from './analysisClient'
 import { priorFor, snapToGrid, stepOnGrid, type LoopSuggestion } from './analyze'
@@ -11,7 +14,7 @@ import { GameSongPlayer } from './player'
 import type { GameSongRatingRecord, WrapRating } from './ratings'
 import { gameSongFiles, songIdFromName, titleFromName } from './songJson'
 import { initialSongState, saveCalmLevel, saveFolder, useGameSongStore, type GameSongState } from './store'
-import { blendSec, BLEND_CHOICES, type BlendChoice } from './wrap'
+import { blendSec, BLEND_CHOICES, songSplitParts, type BlendChoice } from './wrap'
 
 const API = '/__game-song'
 const AUDIO_FILE = /\.(mp3|wav|flac|ogg|m4a|aac)$/i
@@ -33,6 +36,7 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null
 let loadGen = 0
 let scoreGen = 0
 let loadController: AbortController | null = null
+let sendingToEditor = false
 // One recent decoded pair, capped at 192 MiB, including its small peak arrays.
 let cachedStems: { key: string; base: AudioBuffer; top: AudioBuffer; peaks: { base: Float32Array; top: Float32Array } } | null = null
 const STEM_CACHE_BYTES = 192 * 1024 * 1024
@@ -465,6 +469,75 @@ async function runExport(destDir: string): Promise<ExportResult | null> {
     return null
   } finally {
     set({ exporting: false })
+  }
+}
+
+async function fetchStemBytes(name: string, stem: 'base' | 'top'): Promise<ArrayBuffer> {
+  const res = await fetch(`${API}/stem?source=${encodeURIComponent(name)}&stem=${stem}`)
+  if (!res.ok) throw new Error('Could not load the stems')
+  return res.arrayBuffer()
+}
+
+/** Put both stems on the editor timeline, already cut at the selected wrap. */
+export async function sendSongToEditor(): Promise<void> {
+  const { sourceName, title, analysis, loop } = get()
+  const loaded = stems
+  if (!sourceName || !analysis || !loaded || sendingToEditor) return
+  const duration = Math.min(loaded.base.duration, loaded.top.duration, analysis.durationSec)
+  const parts = songSplitParts(duration, loop.startSec, loop.endSec)
+  if (!parts.some(part => part.label === 'loop')) return
+  const gen = loadGen
+  sendingToEditor = true
+  set({ exportError: null })
+  try {
+    const [baseBytes, topBytes] = await Promise.all([fetchStemBytes(sourceName, 'base'), fetchStemBytes(sourceName, 'top')])
+    if (gen !== loadGen || get().sourceName !== sourceName || stems !== loaded) return
+    stopGameSong()
+    const project = useProjectStore.getState()
+    project.pushUndo()
+    const name = title.trim() || sourceName
+    const row0 = project.clips.reduce((max, clip) => Math.max(max, clip.row), -1) + 1
+    const layers = [
+      { kind: 'base' as const, buffer: loaded.base, bytes: baseBytes },
+      { kind: 'top' as const, buffer: loaded.top, bytes: topBytes },
+    ]
+    const loopIds: string[] = []
+    let loopAt = 0
+    layers.forEach((layer, index) => {
+      const bufferId = crypto.randomUUID()
+      cacheBuffer(bufferId, layer.buffer)
+      setPeaksForBuffer(bufferId, layer.buffer)
+      rememberOriginalBytes(bufferId, layer.bytes)
+      const label = `${name} · ${STEM_LABELS[layer.kind]}`
+      useProjectStore.setState(s => ({
+        bufferMeta: [...s.bufferMeta, { id: bufferId, name: label, durationSec: layer.buffer.duration }],
+      }))
+      let startTime = 0
+      for (const part of parts) {
+        const id = useProjectStore.getState().addClipOnExistingBuffer({
+          bufferId,
+          label: `${label} · ${part.label}`,
+          startTime,
+          row: row0 + index,
+          trimStart: part.from,
+          trimEnd: part.to,
+        })
+        if (part.label === 'loop') {
+          loopAt = startTime
+          if (id) loopIds.push(id)
+        }
+        startTime += part.to - part.from
+      }
+    })
+    const st = useProjectStore.getState()
+    if (loopIds.length) st.setSelection(loopIds)
+    st.setPlayhead(loopAt)
+    st.setScrollX(Math.max(0, loopAt * st.pixelsPerSecond - 120))
+    exitGameSongMode()
+  } catch (err) {
+    set({ exportError: err instanceof Error ? err.message : 'Could not send the song to the editor' })
+  } finally {
+    sendingToEditor = false
   }
 }
 

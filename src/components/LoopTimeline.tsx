@@ -3,8 +3,9 @@ import { getCachedBuffer } from '@/audio/bufferCache'
 import { getPeaks } from '@/lib/peaksCache'
 import { rulerStepSeconds } from '@/lib/rulerTicks'
 import { readCssColor, withAlpha } from '@/lib/themeCanvas'
-import { TIMELINE_PAD_L, TIMELINE_PAD_R } from '@/lib/timelineScroll'
+import { clampPixelsPerSecond, TIMELINE_PAD_L, TIMELINE_PAD_R } from '@/lib/timelineScroll'
 import { TRACK_ACCENT_HEXES } from '@/lib/trackAccent'
+import { waveformColumns } from '@/lib/waveform'
 import { filterLoopCandidates } from '@/loop/filters'
 import { selectLoopCandidate } from '@/loop/loopModeActions'
 import { useLoopStore } from '@/store/useLoopStore'
@@ -156,24 +157,21 @@ export function LoopTimeline() {
     const buf = getCachedBuffer(bufferId)
     const peaks = getPeaks(bufferId)
     if (buf && peaks && peaks.length >= 2) {
-      const buckets = peaks.length / 2
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(x0, y0, x1 - x0, ch)
+      ctx.clip()
       ctx.strokeStyle = withAlpha(accent, 0.88)
       ctx.lineWidth = 1
       ctx.beginPath()
       const mid = y0 + ch / 2
-      const cw = Math.max(1, Math.floor(x1 - x0))
-      for (let ix = 0; ix < cw; ix++) {
-        const frac = cw <= 1 ? 0 : ix / (cw - 1)
-        const srcT = trimStart + frac * duration
-        const u = srcT / buf.duration
-        const bi = Math.max(0, Math.min(buckets - 1, Math.floor(u * buckets)))
-        const mn = peaks[bi * 2] ?? 0
-        const mx = peaks[bi * 2 + 1] ?? 0
-        const amp = Math.max(Math.abs(mn), Math.abs(mx)) * (ch / 2) * 0.9
-        ctx.moveTo(x0 + ix, mid - amp)
-        ctx.lineTo(x0 + ix, mid + amp)
+      for (const column of waveformColumns(peaks, buf.duration, { trimStart, trimEnd, speed: 1 }, pps, -x0, w - x0)) {
+        const amp = Math.max(Math.abs(column.min), Math.abs(column.max)) * (ch / 2) * 0.9
+        ctx.moveTo(x0 + column.x + 0.5, mid - amp)
+        ctx.lineTo(x0 + column.x + 0.5, mid + amp)
       }
       ctx.stroke()
+      ctx.restore()
     }
 
     const selected = new Set(selectedIds)
@@ -278,7 +276,7 @@ export function LoopTimeline() {
         const localX = rect ? e.clientX - rect.left : cw / 2
         const factor = zoomFactorFromWheel(e)
         const pps0 = st.pixelsPerSecond
-        const pps1 = Math.max(10, Math.min(500, pps0 * factor))
+        const pps1 = clampPixelsPerSecond(pps0 * factor)
         if (pps1 === pps0) return
         const anchor = localX - TIMELINE_PAD_L
         const t = (anchor + st.scrollX) / pps0
