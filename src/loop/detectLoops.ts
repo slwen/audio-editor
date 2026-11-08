@@ -1,3 +1,4 @@
+import { estimateDownbeat, trackBeats } from '@/loop/beatTrack'
 import { fftRadix2 } from '@/loop/fft'
 import {
   clampVibeWindowSec,
@@ -807,23 +808,45 @@ export function joinPreviewOffset(startSec: number, endSec: number, bpm: number)
   return Math.max(startSec, endSec - lead)
 }
 
-function beatSyncFeatures(
-  frames: FrameFeatures[],
-  hopSec: number,
-  beatOffsetSec: number,
-  bpm: number
-): FrameFeatures[] {
-  const beatSec = 60 / Math.max(1, bpm)
-  const duration = frames.length * hopSec
+function fixedBeatTimes(offsetSec: number, beatSec: number, durationSec: number): number[] {
+  const beats: number[] = []
+  for (let t = Math.max(0, offsetSec); t <= durationSec - 0.1; t += beatSec) beats.push(t)
+  return beats
+}
+
+/** Onsets pile up on the tracked beats, so the grid is following the song rather than a flat signal. */
+function onsetsLandOn(flux: Float32Array, hopSec: number, beatsSec: number[]): boolean {
+  if (beatsSec.length < 8 || hopSec <= 0) return false
+  let on = 0
+  let off = 0
+  let n = 0
+  for (let k = 0; k < beatsSec.length - 1; k++) {
+    const a = Math.round(beatsSec[k]! / hopSec)
+    const b = Math.round(((beatsSec[k]! + beatsSec[k + 1]!) / 2) / hopSec)
+    if (a < 0 || b < 0 || a >= flux.length || b >= flux.length) continue
+    on += flux[a]!
+    off += flux[b]!
+    n++
+  }
+  return n >= 8 && on > off * 1.25
+}
+
+function beatTimes(
+  flux: Float32Array, hopSec: number, bpm: number, durationSec: number, offsetSec: number, beatSec: number
+): number[] {
+  const tracked = trackBeats(flux, hopSec, bpm, durationSec)
+  if (!onsetsLandOn(flux, hopSec, tracked)) return fixedBeatTimes(offsetSec, beatSec, durationSec)
+  return tracked
+}
+
+function beatFeatures(frames: FrameFeatures[], hopSec: number, beatsSec: number[]): FrameFeatures[] {
   const beats: FrameFeatures[] = []
-  for (let t = Math.max(0, beatOffsetSec); t + beatSec * 0.4 < duration; t += beatSec) {
-    beats.push(
-      meanFrames(
-        frames,
-        frameAt(t, hopSec, frames.length),
-        frameAt(t + beatSec, hopSec, frames.length) + 1
-      )
-    )
+  for (let i = 0; i < beatsSec.length - 1; i++) {
+    beats.push(meanFrames(
+      frames,
+      frameAt(beatsSec[i]!, hopSec, frames.length),
+      frameAt(beatsSec[i + 1]!, hopSec, frames.length) + 1
+    ))
   }
   return beats
 }
@@ -1075,6 +1098,10 @@ export function suppressNearDuplicates(candidates: DetectedLoop[], keep = MAX_KE
   const out: DetectedLoop[] = []
   const rivals = (c: DetectedLoop, o: DetectedLoop) => {
     const ov = overlapRatio(c.startSec, c.endSec, o.startSec, o.endSec)
+    if (c.bars === o.bars && c.bars >= 8) {
+      const bar = (c.endSec - c.startSec) / c.bars
+      if (Math.abs(c.startSec - o.startSec) < bar * c.bars) return true
+    }
     if (c.bars === o.bars && ov > 0.45) return true
     if (c.bars !== o.bars && ov > 0.85) {
       const lenC = c.endSec - c.startSec
@@ -1102,6 +1129,22 @@ export function suppressNearDuplicates(candidates: DetectedLoop[], keep = MAX_KE
   return out
 }
 
+/**
+ * The global top ranks are often later copies of the same groove. Keep the earliest
+ * survivor of this length when it starts in the first quarter of the song.
+ */
+function withEarliestStart(list: DetectedLoop[], perLength: number): DetectedLoop[] {
+  const top = list.slice(0, perLength)
+  if (list.length === 0 || perLength < 1) return top
+  const songEnd = list.reduce((max, c) => Math.max(max, c.endSec), 0)
+  let earliest = list[0]!
+  for (const candidate of list) if (candidate.startSec < earliest.startSec) earliest = candidate
+  if (earliest.startSec > songEnd * 0.25 || top.includes(earliest)) return top
+  if (top.length < perLength) top.push(earliest)
+  else top[top.length - 1] = earliest
+  return top
+}
+
 /** Keep the strongest loops of each bar length, so 1-bar grooves cannot fill the list. */
 export function selectAcrossLengths(candidates: DetectedLoop[], perLength = PER_LENGTH_KEEP): DetectedLoop[] {
   const deduped = suppressNearDuplicates(candidates, Math.max(candidates.length, 1))
@@ -1113,10 +1156,31 @@ export function selectAcrossLengths(candidates: DetectedLoop[], perLength = PER_
   }
   const picked: DetectedLoop[] = []
   for (const list of byBars.values()) {
-    picked.push(...list.slice(0, perLength))
+    picked.push(...withEarliestStart(list, perLength))
   }
   picked.sort((a, b) => rankScore(b) - rankScore(a))
   return picked
+}
+
+/**
+ * True when this loop is a crop of a longer stretch that is just as stable.
+ * The loop itself can sit slightly under that line; either the following
+ * stretch or the preceding one being this flat means the phrase does not
+ * end at the loop boundary.
+ */
+function vampCrop(
+  samples: Float32Array, sampleRate: number, startSec: number, endSec: number,
+  bpm: number, frames: FrameFeatures[], hopSec: number, vibeWindowSec: number, homogeneity: number
+): boolean {
+  const dur = endSec - startSec
+  if (dur <= 0 || homogeneity < 0.9) return false
+  const duration = samples.length / sampleRate
+  const stable = (start: number) => {
+    if (start < -1e-3 || start + dur * 2 > duration + 1e-3) return false
+    const longer = scoreLoopWindow(samples, sampleRate, Math.max(0, start), Math.max(0, start) + dur * 2, bpm, frames, hopSec, vibeWindowSec)
+    return longer.homogeneityScore >= 0.95
+  }
+  return stable(startSec) || stable(endSec - dur * 2)
 }
 
 export function detectLoopCandidates(input: DetectLoopsInput): DetectLoopsResult {
@@ -1126,9 +1190,12 @@ export function detectLoopCandidates(input: DetectLoopsInput): DetectLoopsResult
   const { flux, frames, hopSec } = extractHopFeatures(samples, sampleRate)
   const bpm = input.bpmOverride != null && Number.isFinite(input.bpmOverride) && input.bpmOverride >= 40 && input.bpmOverride <= 240
     ? input.bpmOverride : estimateTempoBpm(flux, hopSec)
-  const beatOffsetSec = estimateBeatOffsetSec(flux, hopSec, bpm)
   const beatSec = 60 / bpm
-  const beats = beatSyncFeatures(frames, hopSec, beatOffsetSec, bpm)
+  const fixedOffset = estimateBeatOffsetSec(flux, hopSec, bpm)
+  const beatsSec = beatTimes(flux, hopSec, bpm, duration, fixedOffset, beatSec)
+  const downbeat = estimateDownbeat(frames, hopSec, beatsSec)
+  const beatOffsetSec = beatsSec[downbeat.beat] ?? beatsSec[0] ?? fixedOffset
+  const beats = beatFeatures(frames, hopSec, beatsSec)
   const transitionModels = new Map<number, TransitionModel>()
 
   const raw: DetectedLoop[] = []
@@ -1148,26 +1215,37 @@ export function detectLoopCandidates(input: DetectLoopsInput): DetectLoopsResult
     if (windowSec < 0.2) continue
     const windowBeats = Math.max(1, Math.round(windowSec / beatSec))
 
-    // A useful bed need not repeat again in the source song. Search every
-    // beat phase, then keep alternatives within each bar before final scoring.
-    // Picking a single stripe seed used to discard all long windows when its
-    // favourite offset failed a later stability gate.
-    const shortlist: { startBeat: number; ranked: number }[] = []
-    for (let block = 0; block <= beats.length - lag; block += 4) {
-      const options: { startBeat: number; ranked: number }[] = []
-      for (let startBeat = block; startBeat < block + 4 && startBeat + lag <= beats.length; startBeat++) {
-        const start = beatOffsetSec + startBeat * beatSec
-        const end = start + lenSec
-        if (end > duration) continue
-        const wrap = beatWrapVibe(beats, startBeat, startBeat + lag, windowBeats)
-        if (wrap < MIN_WRAP - 0.08) continue
-        const hom = scoreHomogeneity(frames, hopSec, start, end, 4 * beatSec)
-        if (hom < (bars >= 16 ? 0.92 : bars >= 8 ? 0.9 : bars >= 4 ? 0.86 : 0)) continue
-        const closure = scorePhraseClosure(frames, hopSec, start, end, windowSec) ?? wrap
-        options.push({ startBeat, ranked: 0.75 * closure + 0.25 * wrap })
+    // 4–16 bar loops have to start on the downbeat. Searching every beat phase
+    // filled the list with mid-bar cuts that scored well and sounded wrong.
+    // 1–2 bar grooves still try each phase, keeping two per bar.
+    const shortlist: { start: number; end: number }[] = []
+    const lockToBar = bars >= 4
+    const pushOption = (startBeat: number, into: { start: number; end: number; ranked: number }[]) => {
+      const endBeat = startBeat + lag
+      if (startBeat < 0 || endBeat >= beatsSec.length || endBeat > beats.length) return
+      const start = beatsSec[startBeat]!
+      const end = beatsSec[endBeat]!
+      if (end > duration || end - start < MIN_LOOP_SEC) return
+      const wrap = beatWrapVibe(beats, startBeat, endBeat, windowBeats)
+      if (wrap < MIN_WRAP - 0.08) return
+      const hom = scoreHomogeneity(frames, hopSec, start, end, (end - start) / bars)
+      if (hom < (bars >= 16 ? 0.92 : bars >= 8 ? 0.9 : bars >= 4 ? 0.86 : 0)) return
+      const closure = scorePhraseClosure(frames, hopSec, start, end, windowSec) ?? wrap
+      into.push({ start, end, ranked: 0.75 * closure + 0.25 * wrap })
+    }
+    if (lockToBar) {
+      for (let startBeat = downbeat.beat; startBeat + lag < beatsSec.length; startBeat += 4) {
+        const options: { start: number; end: number; ranked: number }[] = []
+        pushOption(startBeat, options)
+        shortlist.push(...options)
       }
-      options.sort((a, b) => b.ranked - a.ranked)
-      shortlist.push(...options.slice(0, 2))
+    } else {
+      for (let block = 0; block + lag < beatsSec.length; block += 4) {
+        const options: { start: number; end: number; ranked: number }[] = []
+        for (let phase = 0; phase < 4; phase++) pushOption(block + phase, options)
+        options.sort((a, b) => b.ranked - a.ranked)
+        shortlist.push(...options.slice(0, 2))
+      }
     }
     let model = transitionModels.get(windowSec)
     if (!model) {
@@ -1175,9 +1253,7 @@ export function detectLoopCandidates(input: DetectLoopsInput): DetectLoopsResult
       transitionModels.set(windowSec, model)
     }
     for (const option of shortlist) {
-      const s = beatOffsetSec + option.startBeat * beatSec
-      const e = s + lenSec
-      const placed = placeSeam(s, e)
+      const placed = placeSeam(option.start, option.end)
       const scored = scoreLoopWindow(
         samples,
         sampleRate,
@@ -1198,6 +1274,9 @@ export function detectLoopCandidates(input: DetectLoopsInput): DetectLoopsResult
       if (bars >= 4 && scored.homogeneityScore < 0.86) continue
       if (bars >= 8 && scored.homogeneityScore < 0.9) continue
       if (bars >= 16 && scored.homogeneityScore < 0.92) continue
+      // A long crop of a vamp that is just as stable at twice the length is not a phrase.
+      // Extending a real 8- or 16-bar phrase falls apart.
+      if (bars >= 8 && vampCrop(samples, sampleRate, placed.s, placed.e, bpm, frames, hopSec, vibeWindowSec, scored.homogeneityScore)) continue
       raw.push({ startSec: placed.s, endSec: placed.e, bars, ...scored })
     }
   }

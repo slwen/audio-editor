@@ -261,6 +261,24 @@ describe('suppressNearDuplicates', () => {
     expect(kept).toHaveLength(2)
   })
 
+  it('keeps an early loop when later copies of the same length score higher', () => {
+    const later = Array.from({ length: 10 }, (_, i) => ({
+      startSec: 40 + i * 20,
+      endSec: 56 + i * 20,
+      bars: 8 as const,
+      seamScore: 0.9,
+      contextScore: 0.9,
+      homogeneityScore: 0.95,
+      qualityScore: 0.9,
+    }))
+    const early = {
+      startSec: 1, endSec: 17, bars: 8 as const,
+      seamScore: 0.8, contextScore: 0.8, homogeneityScore: 0.93, qualityScore: 0.7,
+    }
+    const kept = selectAcrossLengths([early, ...later], 8)
+    expect(kept.some((c) => c.bars === 8 && c.startSec < 5)).toBe(true)
+  })
+
   it('keeps a longer loop when shorter ones score higher', () => {
     const shorts = Array.from({ length: 12 }, (_, i) => ({
       startSec: i * 3,
@@ -427,16 +445,37 @@ describe('long musical beds', () => {
     expect(Math.abs(64 * 60 / estimated - 64 * 60 / bpm)).toBeLessThan(0.04)
   })
 
-  it('keeps useful 4, 8 and 16 bar options for a stable long bed', () => {
+  it('starts 4-bar loops on the downbeat, including one from the start of the phrase', () => {
+    const sr = 8000
+    const bpm = 120
+    const beatSec = 60 / bpm
+    const barSec = beatSec * 4
+    const bars = 24
+    const samples = new Float32Array(Math.floor(sr * barSec * bars))
+    for (let i = 0; i < samples.length; i++) samples[i] = 0.2 * Math.sin((2 * Math.PI * 220 * i) / sr)
+    const click = Math.floor(sr * 0.01)
+    for (let beat = 0; beat * beatSec * sr < samples.length; beat++) {
+      const pos = Math.floor(beat * beatSec * sr)
+      const accent = beat % 4 === 0 ? 1 : 0.25
+      for (let k = 0; k < click && pos + k < samples.length; k++) samples[pos + k] += accent * (1 - k / click)
+    }
+    const result = detectLoopCandidates({ samples, sampleRate: sr, bpmOverride: bpm })
+    const fours = result.candidates.filter((c) => c.bars === 4)
+    expect(fours.some((c) => c.startSec < barSec)).toBe(true)
+    for (const c of fours) {
+      const phase = ((c.startSec % barSec) + barSec) % barSec
+      expect(Math.min(phase, barSec - phase)).toBeLessThan(0.12)
+    }
+  })
+
+  it('keeps a 4 bar option on a tone and does not crop 8 or 16 bars out of a phrase that never ends', () => {
     const sr = 4000
-    const samples = new Float32Array(sr * 80)
+    const samples = new Float32Array(sr * 140)
     for (let i = 0; i < samples.length; i++) {
       samples[i] = 0.3 * Math.sin(2 * Math.PI * 220 * i / sr)
     }
     const result = detectLoopCandidates({ samples, sampleRate: sr, bpmOverride: 120 })
-    for (const bars of [4, 8, 16]) expect(result.candidates.some(c => c.bars === bars)).toBe(true)
-    for (const c of result.candidates) {
-      expect(c.endSec - c.startSec).toBeCloseTo(c.bars * 4 * 60 / result.bpm, 5)
-    }
+    expect(result.candidates.some(c => c.bars === 4)).toBe(true)
+    expect(result.candidates.some(c => c.bars >= 8)).toBe(false)
   })
 })
